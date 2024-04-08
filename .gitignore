@@ -162,3 +162,4 @@ cython_debug/
 kernel*
 fusion_result.json
 play*
+.vscode
