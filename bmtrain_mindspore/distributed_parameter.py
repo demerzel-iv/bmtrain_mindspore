@@ -38,8 +38,7 @@ class DistributedParameter(Parameter):
 
     def gather(self) -> Tensor:
         all_gather = ops.AllGather()
-        x = self.value()
-        x: Tensor = all_gather(x)
+        x: Tensor = all_gather(self)
         x = x[:self._original_size]
         x = x.reshape(self._original_shape)
         return x
