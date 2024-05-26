@@ -1,3 +1,5 @@
+from . import model_center
+
 from .initialization import init_distributed
 from .global_var import rank, world_size
 from .utils import print_rank

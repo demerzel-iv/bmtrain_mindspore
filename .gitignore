@@ -163,3 +163,5 @@ kernel*
 fusion_result.json
 play*
 .vscode
+msrun_log
+ir

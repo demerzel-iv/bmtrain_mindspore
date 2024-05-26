@@ -1,12 +1,12 @@
+import math
+import mindspore as ms
+
+from typing import Tuple
 from mindspore import ops
 from mindspore import Tensor, Parameter
-from typing import Tuple
 
 from .utils import print_rank
 from .global_var import config
-
-import math
-import mindspore as ms
 
 PAD_VALUE = 0
 
@@ -38,6 +38,7 @@ class DistributedParameter(Parameter):
 
     def gather(self) -> Tensor:
         all_gather = ops.AllGather()
+
         x: Tensor = all_gather(self)
         x = x[:self._original_size]
         x = x.reshape(self._original_shape)

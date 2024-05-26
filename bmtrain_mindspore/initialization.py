@@ -4,6 +4,9 @@ import mindspore as ms
 from .global_var import config
 
 def init_distributed():
+    if config['initialized']:
+        return 
+
     ms.communication.init('hccl')
     world_size = ms.communication.get_group_size()
     rank = ms.communication.get_rank()
