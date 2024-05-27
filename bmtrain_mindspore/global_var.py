@@ -10,7 +10,9 @@ class ConfigMap(TypedDict):
 config = ConfigMap(rank=0, world_size=1, initialized=False)
 
 def rank():
+    assert config['initialized']
     return config['rank']
 
 def world_size():
+    assert config['initialized']
     return config['world_size']
