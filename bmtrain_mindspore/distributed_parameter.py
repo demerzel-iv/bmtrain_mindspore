@@ -43,3 +43,6 @@ class DistributedParameter(Parameter):
         x = x[:self._original_size]
         x = x.reshape(self._original_shape)
         return x
+
+    def __str__(self):
+        return 'Distributed ' + super().__str__()

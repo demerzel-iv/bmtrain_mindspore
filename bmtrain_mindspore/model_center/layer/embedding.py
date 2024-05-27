@@ -14,17 +14,15 @@ class Embedding(DistributedModule):
         vocab_size: int,
         embedding_size: int,
         padding_idx: int = None,
-        init: Union[str, Tensor] = 'norm',
+        init: Union[str, Tensor] = 'normal',
     ):
         super().__init__()
         self.vocab_size = vocab_size
         self.dim_model = embedding_size
         self.padding_idx = padding_idx
-
-        self.weight = DistributedParameter(initializer(
-            init=init,
-            shape=(vocab_size, embedding_size)
-        ))
+        # initialize the weight
+        init_tensor = initializer(init=init, shape=(vocab_size, embedding_size))
+        self.weight = DistributedParameter(init_tensor)
 
     def construct(self, ids: Tensor) -> Tensor:
         """
