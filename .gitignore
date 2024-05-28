@@ -163,5 +163,6 @@ kernel*
 fusion_result.json
 play*
 .vscode
+*.code-workspace
 msrun_log
 ir

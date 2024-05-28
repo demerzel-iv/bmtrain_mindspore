@@ -8,7 +8,7 @@ from mindspore import nn, ops
 from mindspore import Tensor, Parameter
 
 from bmtrain_mindspore import DistributedParameter, DistributedModule
-from bmtrain_mindspore.model_center.layer import Embedding
+from bmtrain_mindspore.model_center.layer import Embedding, Linear
 
 OUTPUT_PATH = '/root/output'
 
@@ -108,10 +108,31 @@ def test6():
 
     bms.print_rank(convert_model_to_param_dict(t))
 
+def test_linear():
+    np.random.seed(1926)
+    n, m = 3, 5
+    a = np.random.normal(size=(n,m))
+    b = np.random.normal(size=(2, 3, 4, n))
+    print(a, b)
+
+    lin = Linear(n,m,init=Tensor(a, dtype=ms.float32))
+    b = Tensor(b, dtype=ms.float32)
+
+    def func(x):
+        return ops.sum(lin.construct(x))
+    grad_fn = ms.value_and_grad(func, weights=lin.trainable_params(), grad_position=None)
+
+    out, grad = grad_fn(b)
+    print('-----rank-{}, [{}], [{}]------'.format(bms.rank(), out, grad))
+
 def main():
-    bms.init_distributed()
+    try:
+        bms.init_distributed()
+    except Exception:
+        print("init_distributed failed")
+
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    test6()
+    test_linear()
 
 if __name__ == '__main__':
     main()
