@@ -14,7 +14,7 @@ class Linear(DistributedModule):
         dim_in: int,
         dim_out: int,
         bias: bool = False,
-        init: Union[str, Tensor] = 'normal',
+        init = 'normal',
     ):
         super().__init__()
         self.dim_in = dim_in

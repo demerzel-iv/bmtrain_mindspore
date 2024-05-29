@@ -14,7 +14,7 @@ class Embedding(DistributedModule):
         vocab_size: int,
         embedding_size: int,
         padding_idx: int = None,
-        init: Union[str, Tensor] = 'normal',
+        init = 'normal',
     ):
         super().__init__()
         self.vocab_size = vocab_size
