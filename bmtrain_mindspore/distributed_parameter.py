@@ -13,6 +13,7 @@ PAD_VALUE = 0
 class DistributedParameter(Parameter):
     _original_size: int
     _original_shape : Tuple
+    all_gather_ops: ops.AllGather
 
     def __new__(cls, x: Tensor, *args, **kwargs):
         num_tot = x.numel()
@@ -33,13 +34,12 @@ class DistributedParameter(Parameter):
 
         obj._original_size = num_tot
         obj._original_shape = original_shape
+        obj.all_gather_ops = ops.AllGather()
 
         return obj
 
     def gather(self) -> Tensor:
-        all_gather = ops.AllGather()
-
-        x: Tensor = all_gather(self)
+        x: Tensor = self.all_gather_ops(self)
         x = x[:self._original_size]
         x = x.reshape(self._original_shape)
         return x

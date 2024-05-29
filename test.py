@@ -125,6 +125,14 @@ def test_linear():
     out, grad = grad_fn(b)
     print('-----rank-{}, [{}], [{}]------'.format(bms.rank(), out, grad))
 
+def test_layer_norm():
+    from bmtrain_mindspore.model_center.layer import LayerNorm
+    n, m = 3, 5
+    ln = LayerNorm(m, 1e-12, True, init=Tensor(np.ones(5), dtype=ms.float32))
+    a = np.random.normal(size=(n,m))
+    a = Tensor(a, dtype=ms.float32)
+    bms.print_rank(ln.construct(a))
+
 def main():
     try:
         bms.init_distributed()
@@ -132,7 +140,7 @@ def main():
         print("init_distributed failed")
 
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    test_linear()
+    test_layer_norm()
 
 if __name__ == '__main__':
     main()
