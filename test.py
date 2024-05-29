@@ -133,6 +133,26 @@ def test_layer_norm():
     a = Tensor(a, dtype=ms.float32)
     bms.print_rank(ln.construct(a))
 
+def test_attention():
+    from bmtrain_mindspore.model_center.layer import Attention
+
+    dim=24
+    dim_head=3
+    att = Attention(
+        dim_in=dim,
+        dim_head=dim_head,
+        num_heads=dim // dim_head,
+    )
+    lq = 12
+    lk = 7
+
+    q = Tensor(np.random.normal(size=(1, lq, dim)), dtype=ms.float32)
+    kv = Tensor(np.random.normal(size=(1, lk, dim)), dtype=ms.float32)
+    mask = Tensor(np.random.randint(0, 2, size=(1, lq, lk)), dtype=ms.bool_)
+
+    res = att.construct(q, kv, mask)
+    bms.print_rank(res)
+
 def main():
     try:
         bms.init_distributed()
@@ -140,7 +160,7 @@ def main():
         print("init_distributed failed")
 
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    test_layer_norm()
+    test_attention()
 
 if __name__ == '__main__':
     main()
