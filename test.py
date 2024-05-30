@@ -153,6 +153,23 @@ def test_attention():
     res = att.construct(q, kv, mask)
     bms.print_rank(res)
 
+def test_ffn():
+    from bmtrain_mindspore.model_center.layer import FeedForward
+
+    dim=24
+    dim_ff = 129
+    ffn = FeedForward(
+        dim_in=dim,
+        dim_ff=dim_ff,
+        activate_fn='gated_silu'
+    )
+    n = 12
+
+    x = Tensor(np.random.normal(size=(3, n, dim)), dtype=ms.float32)
+
+    res = ffn.construct(x)
+    bms.print_rank(res)
+
 def main():
     try:
         bms.init_distributed()
@@ -160,7 +177,7 @@ def main():
         print("init_distributed failed")
 
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    test_attention()
+    test_ffn()
 
 if __name__ == '__main__':
     main()
