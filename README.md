@@ -36,17 +36,21 @@
         new_type = cls._get_base_class(input_class)
 ```
 
-## 现有功能
+## 已完成
 
 - 分布式模型存储
 - 分布式模型的保存/加载
-- 前向/反向传播计算
-- 模型组件：Linear, Embedding, LayerNorm, Attention
+- 前向/反向传播计算正确性验证
+- 模型组件：Linear, Embedding, LayerNorm, Attention, FeedForward
 
 ## TODOLIST
 
-- 迁移LLaMA模型，验证正确性
-    - 模型组件：FeedForward, TransformerBlock
+- 迁移LLaMA模型(LLaMA2-7B)，验证正确性
     - 完整模型：组合模型插件实现
     - huggingface的ckpt到mindspore的ckpt的转换脚本
     - 正确性验证：前向/反向传播
+- optimizer
+    - Adam优化器
+    - 管理器
+- ZeRO优化
+- 验证模型训练能正确收敛
