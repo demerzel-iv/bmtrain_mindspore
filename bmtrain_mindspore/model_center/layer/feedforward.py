@@ -63,7 +63,6 @@ class FeedForward(DistributedModule):
         dim_out : int = None,
         activate_fn: str = "gated_gelu",
         bias: bool = False,
-        length_scale : bool = False,
         dropout_p: float = None,
     ):
         super().__init__()

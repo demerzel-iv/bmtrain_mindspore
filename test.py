@@ -156,17 +156,18 @@ def test_attention():
 def test_ffn():
     from bmtrain_mindspore.model_center.layer import FeedForward
 
-    dim=24
+    dim=13
     dim_ff = 129
     ffn = FeedForward(
         dim_in=dim,
         dim_ff=dim_ff,
         activate_fn='gated_silu'
     )
-    n = 12
+    n = 7
 
     x = Tensor(np.random.normal(size=(3, n, dim)), dtype=ms.float32)
 
+    bms.print_rank(x)
     res = ffn.construct(x)
     bms.print_rank(res)
 

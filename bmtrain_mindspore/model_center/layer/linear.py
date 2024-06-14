@@ -20,7 +20,7 @@ class Linear(DistributedModule):
         self.dim_in = dim_in
         self.dim_out = dim_out
         # initialize the weight
-        init_tensor = initializer(init=init, shape=(dim_in, dim_out))
+        init_tensor = Tensor(initializer(init=init, shape=(dim_in, dim_out)).numpy()) # convert to numpy to avoid a bug in `initializer`
         self.weight = DistributedParameter(init_tensor)
         self.bias = DistributedParameter(
             Tensor(np.zeros(shape=(dim_out,)), dtype=ms.float32)
