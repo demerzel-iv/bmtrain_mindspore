@@ -1,0 +1,111 @@
+import numpy as np
+import mindspore as ms
+
+from mindspore import ops, Tensor, nn
+from mindspore.nn import Cell
+
+from .attention import AttentionBlock
+from .feedforward import FFNBlock
+from .layer_norm import LayerNorm
+
+class TransformerBlock(Cell):
+    def __init__(
+        self,
+        dim_model: int,
+        dim_ff: int,
+        num_heads: int,
+        dim_head: int,
+        activate_fn: str = 'gated_silu',
+        eps: float = 1e-5,
+        dropout_p: float = None,
+        post_layer_norm: bool = False,
+    ):
+        super().__init__()
+        self.self_att = AttentionBlock(
+            dim_model=dim_model,
+            dim_head=dim_head,
+            num_heads=num_heads,
+            dropout_p=dropout_p,
+            norm_eps=eps,
+            post_layer_norm=post_layer_norm,
+        )
+        self.ffn = FFNBlock(
+            dim_model=dim_model,
+            dim_ff=dim_ff,
+            activate_fn=activate_fn,
+            bias=False,
+            dropout_p=dropout_p,
+            norm_eps=eps,
+            post_layer_norm=post_layer_norm,
+        )
+    
+    def construct(
+        self,
+        hidden_states: Tensor,
+        attention_mask: Tensor,
+        position_bias = None,
+        use_cache: bool = False,
+        past_key_value = None,
+    ):
+        hidden_states, current_key_value = self.self_att.construct(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            position_bias=position_bias,
+            use_cache=use_cache,
+            past_key_value=past_key_value,
+        )
+        hidden_states = self.ffn.construct(hidden_states)
+        return hidden_states, current_key_value
+
+
+class Encoder(Cell):
+    def __init__(
+        self,
+        num_layers: int,
+        dim_model: int,
+        dim_ff: int,
+        num_heads: int,
+        dim_head: int,
+        activate_fn: str = 'gated_silu',
+        eps: float = 1e-5,
+        dropout_p: float = None,
+        post_layer_norm: bool = False,
+    ):
+        super().__init__()
+        self.layers = nn.CellList([
+            TransformerBlock(
+                dim_model=dim_model,
+                dim_ff=dim_ff,
+                num_heads=num_heads,
+                dim_head=dim_head,
+                activate_fn=activate_fn,
+                eps=eps,
+                dropout_p=dropout_p,
+                post_layer_norm=post_layer_norm,
+            ) for i in range(num_layers)
+        ])
+        self.output_layer_norm = LayerNorm(
+            dim_norm=dim_model,
+            eps=eps,
+            rms_layer_norm=False,
+        )
+
+    def construct(
+        self,
+        hidden_states: Tensor,
+        attention_mask: Tensor,
+        position_bias = None,
+        use_cache: bool = False,
+        past_key_value = None
+    ):
+        for module in self.layers:
+            module: TransformerBlock 
+            hidden_states, current_key_value = module.construct(
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                position_bias=position_bias,
+                use_cache=use_cache,
+                past_key_value=past_key_value,
+            )
+        hidden_states = self.output_layer_norm(hidden_states)
+        return hidden_states

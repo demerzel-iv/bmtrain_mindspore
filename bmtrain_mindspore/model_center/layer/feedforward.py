@@ -1,16 +1,13 @@
-import math
 import numpy as np
 import mindspore as ms
 
-from typing import Union
-from mindspore.common.initializer import initializer
 from mindspore import ops, Tensor, nn
+from mindspore.nn import Cell
 
-from ...distributed_module import DistributedModule
-from ...distributed_parameter import DistributedParameter
 from .linear import Linear
+from .layer_norm import LayerNorm
 
-class DenseACT(DistributedModule):
+class DenseACT(Cell):
     def __init__(
         self,
         dim_in : int,
@@ -55,7 +52,7 @@ class DenseACT(DistributedModule):
             y = y * z
         return y
 
-class FeedForward(DistributedModule):
+class FeedForward(Cell):
     def __init__(
         self,
         dim_in : int, 
@@ -93,3 +90,47 @@ class FeedForward(DistributedModule):
             x = self.dropout(x)
         x = self.w_out(x)
         return x
+
+
+class FFNBlock(Cell):
+    def __init__(
+        self,
+        dim_model: int,
+        dim_ff: int,
+        activate_fn: str = 'gated_gelu',
+        bias: bool = False,
+        dropout_p: float = None,
+        norm_eps: float = 1e-5,
+        post_layer_norm: bool = False,
+    ):
+        super().__init__()
+        self.layernorm = LayerNorm(
+            dim_norm=dim_model,
+            eps=norm_eps,
+            rms_layer_norm=False,
+        )
+        self.ffn = FeedForward(
+            dim_in=dim_model,
+            dim_ff=dim_ff,
+            activate_fn=activate_fn,
+            bias=bias,
+            dropout_p=dropout_p,
+        )
+        self.dropout = nn.Dropout(p=dropout_p) if dropout_p != None else None
+        self.post_layer_norm = post_layer_norm
+
+    def construct(self, hidden_states: Tensor):
+        """
+        Args:
+            hidden_states: A tensor of shape (..., dim_model).
+        Returns:
+            A tensor of shape (..., dim_model).
+        """
+        x = self.layernorm(hidden_states)
+        if self.post_layer_norm:
+            hidden_states = x
+        x = self.ffn(x)
+        if self.dropout != None:
+            x = self.dropout(x)
+        hidden_states = hidden_states + x
+        return hidden_states

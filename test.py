@@ -9,6 +9,7 @@ from mindspore import Tensor, Parameter
 
 from bmtrain_mindspore import DistributedParameter, DistributedModule
 from bmtrain_mindspore.model_center.layer import Embedding, Linear
+from bmtrain_mindspore.model_center import layer
 
 OUTPUT_PATH = '/root/output'
 
@@ -171,6 +172,45 @@ def test_ffn():
     res = ffn.construct(x)
     bms.print_rank(res)
 
+def test_att_block():
+    from bmtrain_mindspore.model_center.layer import AttentionBlock
+
+    dim=24
+    dim_head=3
+    att = AttentionBlock(
+        dim_model=dim,
+        dim_head=dim_head,
+        num_heads=dim // dim_head,
+    )
+    n = 12
+
+    hs = Tensor(np.random.normal(size=(1, n, dim)), dtype=ms.float32)
+    mask = Tensor(np.random.randint(0, 2, size=(1, n, n)), dtype=ms.bool_)
+
+    res, _ = att.construct(hs, mask) 
+    bms.print_rank(res)
+
+def test_transformer():
+    dim=24
+    dim_ff=55
+    dim_head=3
+    tsm = layer.Encoder(
+        num_layers=12,
+        dim_model=dim,
+        dim_ff=dim_ff,
+        num_heads=dim // dim_head,
+        dim_head=dim_head,
+    )
+
+    n = 12
+    hs = Tensor(np.random.normal(size=(1, n, dim)), dtype=ms.float32)
+    mask = Tensor(np.random.randint(0, 2, size=(1, n, n)), dtype=ms.bool_)
+    res = tsm.construct(
+        hidden_states=hs,
+        attention_mask=mask
+    )
+    bms.print_rank(res)
+
 def main():
     try:
         bms.init_distributed()
@@ -178,7 +218,7 @@ def main():
         print("init_distributed failed")
 
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    test_ffn()
+    test_transformer()
 
 if __name__ == '__main__':
     main()

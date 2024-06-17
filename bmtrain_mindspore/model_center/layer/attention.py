@@ -2,22 +2,19 @@ import math
 import numpy as np
 import mindspore as ms
 
-from typing import Union
-from mindspore.common.initializer import initializer
 from mindspore import ops, Tensor, nn
+from mindspore.nn import Cell
 
-from ...distributed_module import DistributedModule
-from ...distributed_parameter import DistributedParameter
 from .linear import Linear
+from .layer_norm import LayerNorm
 
-class Attention(DistributedModule):
+class Attention(Cell):
     def __init__(
         self,
         dim_in: int, 
         dim_head: int,
         num_heads: int, 
         dim_out: int = None,
-        bias: bool = False,
         mask_value: float = float("-inf"),
         pos_bias_type: str = "none",
         attn_scale: bool = False,
@@ -141,7 +138,68 @@ class Attention(DistributedModule):
         output = output.reshape(batch_size, len_q, self.num_heads * self.dim_head)  # (batch, len_q, num_heads * dim_head)
         output = self.attention_out.construct(output)                                         # (batch, len_q, dim_out)
 
-        if use_cache:
-            return output, current_key_value
-        else:
-            return output
+        return output, current_key_value
+
+
+class AttentionBlock(Cell):
+    def __init__(
+        self,
+        dim_model: int, 
+        dim_head: int,
+        num_heads: int, 
+        dim_out: int = None,
+        pos_bias_type: str = "none",
+        attn_scale: bool = False,
+        dropout_p: float = None,
+        num_heads_kv: int = -1,
+        norm_eps: float = 1e-5,
+        post_layer_norm: bool = False,
+    ):
+        super().__init__()
+        self.layernorm = LayerNorm(
+            dim_norm=dim_model,
+            eps=norm_eps,
+            rms_layer_norm=False,
+        )
+        self.attention = Attention(
+            dim_in=dim_model,
+            dim_head=dim_head,
+            num_heads=num_heads,
+            dim_out=dim_out,
+            pos_bias_type=pos_bias_type,
+            attn_scale=attn_scale,
+            dropout_p=dropout_p,
+            num_heads_kv=num_heads_kv,
+        )
+        self.dropout = nn.Dropout(p=dropout_p) if dropout_p != None else None
+        self.post_layer_norm = post_layer_norm
+
+    def construct(
+        self,
+        hidden_states: Tensor,
+        attention_mask: Tensor,
+        position_bias = None,
+        use_cache: bool = False,
+        past_key_value = None,
+    ):
+        """
+        Args:
+            hidden_states: A tensor of shape (batch, n, dim_model).
+            attention_mask: A tensor of shape (batch, n, n).
+        Returns:
+            A tensor of shape (batch, n, dim_model).
+        """
+        x = self.layernorm.construct(hidden_states)
+        if self.post_layer_norm:
+            hidden_states = x
+        x, current_key_value = self.attention.construct(
+            x, x,
+            attention_mask=attention_mask,
+            position_bias=position_bias,
+            use_cache=use_cache,
+            past_key_value=past_key_value,
+        )
+        if self.dropout != None:
+            x = self.dropout(x)
+        hidden_states = hidden_states + x
+        return hidden_states, current_key_value
