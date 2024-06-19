@@ -42,12 +42,12 @@
 - 分布式模型的保存/加载
 - 前向/反向传播计算正确性验证
 - 模型组件：Linear, Embedding, LayerNorm, Attention, FeedForward
+- 完整模型：组合模型插件实现
+- huggingface的ckpt到mindspore的ckpt的转换脚本
 
 ## TODOLIST
 
 - 迁移LLaMA模型(LLaMA2-7B)，验证正确性
-    - 完整模型：组合模型插件实现
-    - huggingface的ckpt到mindspore的ckpt的转换脚本
     - 正确性验证：前向/反向传播
 - optimizer
     - Adam优化器
