@@ -1,6 +1,7 @@
 import numpy as np
 import mindspore as ms
 
+from typing import Tuple
 from mindspore import ops, Tensor, nn
 from mindspore.nn import Cell
 
@@ -47,6 +48,15 @@ class TransformerBlock(Cell):
         use_cache: bool = False,
         past_key_value = None,
     ):
+        """
+        Args:
+            hidden_states: A tensor of shape (batch, seq_len, dim_model).
+            attention_mask: A tensor of shape (batch, seq_len, seq_len+pkv_len).
+            position_bias: A callable object for rotary embedding.
+        Returns:
+            - A tensor of shape (batch, seq_len, dim_model).
+            - current_key_value if use_cache is True else None.
+        """
         hidden_states, current_key_value = self.self_att.construct(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -96,16 +106,27 @@ class Encoder(Cell):
         attention_mask: Tensor,
         position_bias = None,
         use_cache: bool = False,
-        past_key_value = None
-    ):
-        for module in self.layers:
+        past_key_values: Tuple[Tuple[Tensor]] = None
+    ) -> Tuple[Tensor, Tuple[Tuple[Tensor]]]:
+        """
+        Args:
+            hidden_states: A tensor of shape (batch, seq_len, dim_model).
+            attention_mask: A tensor of shape (batch, seq_len, seq_len+pkv_len).
+            position_bias: A callable object for rotary embedding.
+        Returns:
+            - A tensor of shape (batch, seq_len, dim_model).
+            - A tulple consists of current_key_value if use_cache is True else None.
+        """
+        current_key_values = ()
+        for i, module in enumerate(self.layers):
             module: TransformerBlock 
             hidden_states, current_key_value = module.construct(
                 hidden_states=hidden_states,
                 attention_mask=attention_mask,
                 position_bias=position_bias,
                 use_cache=use_cache,
-                past_key_value=past_key_value,
+                past_key_value=past_key_values[i] if past_key_values != None else None,
             )
-        hidden_states = self.output_layer_norm(hidden_states)
-        return hidden_states
+            current_key_values += (current_key_value,)
+        hidden_states = self.output_layer_norm.construct(hidden_states)
+        return hidden_states, current_key_values

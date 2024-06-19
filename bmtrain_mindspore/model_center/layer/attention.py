@@ -2,6 +2,7 @@ import math
 import numpy as np
 import mindspore as ms
 
+from typing import Callable, Tuple
 from mindspore import ops, Tensor, nn
 from mindspore.nn import Cell
 
@@ -15,7 +16,6 @@ class Attention(Cell):
         dim_head: int,
         num_heads: int, 
         dim_out: int = None,
-        mask_value: float = float("-inf"),
         pos_bias_type: str = "none",
         attn_scale: bool = False,
         dropout_p: float = None,
@@ -31,6 +31,7 @@ class Attention(Cell):
         self.attn_scale = attn_scale
         assert num_heads % num_heads_kv == 0
         self.num_head_groups = num_heads // num_heads_kv
+        self.pos_bias_type = pos_bias_type
 
         self.project_q = Linear(
             dim_in=dim_in,
@@ -59,15 +60,16 @@ class Attention(Cell):
         query: Tensor,
         key_value: Tensor,
         attention_mask: Tensor,
-        position_bias = None,
+        position_bias: Callable[[Tensor, Tensor], Tuple[Tensor, Tensor]] = None,
         use_cache: bool = False,
-        past_key_value = None,
+        past_key_value: Tuple[Tensor] = None,
     ):
         """
         Args:
             query: A tensor of shape (batch, len_q, dim_in).
             key_value: A tensor of shape (batch, len_k, dim_in).
             attention_mask: A tensor of shape (batch, len_q, len_k).
+            position_bias: A callable object for rotary embedding.
         Returns:
             A tensor of shape (batch, len_q, dim_out).
         """
@@ -105,8 +107,8 @@ class Attention(Cell):
         # for future calculation
         current_key_value = (h_k, h_v) if use_cache else None
 
-        #TODO if self.pos_bias_type == "rotary":
-        #    h_q, h_k = position_bias(h_q, h_k)
+        if self.pos_bias_type == "rotary":
+            h_q, h_k = position_bias(h_q, h_k)
 
         # calculate attention scores
         score: Tensor = ops.matmul(h_q, h_k.permute(0, 1, 3, 2)) # (batch, num_heads, len_q, len_k)
@@ -136,7 +138,7 @@ class Attention(Cell):
         output: Tensor = ops.matmul(score, h_v)                                     # (batch, num_heads, len_q, dim_head)
         output = output.permute(0, 2, 1, 3)                                         # (batch, len_q, num_heads, dim_head)
         output = output.reshape(batch_size, len_q, self.num_heads * self.dim_head)  # (batch, len_q, num_heads * dim_head)
-        output = self.attention_out.construct(output)                                         # (batch, len_q, dim_out)
+        output = self.attention_out.construct(output)                               # (batch, len_q, dim_out)
 
         return output, current_key_value
 
@@ -184,10 +186,11 @@ class AttentionBlock(Cell):
     ):
         """
         Args:
-            hidden_states: A tensor of shape (batch, n, dim_model).
-            attention_mask: A tensor of shape (batch, n, n).
+            hidden_states: A tensor of shape (batch, seq_len, dim_model).
+            attention_mask: A tensor of shape (batch, seq_len, seq_len+pkv_len).
+            position_bias: A callable object for rotary embedding.
         Returns:
-            A tensor of shape (batch, n, dim_model).
+            A tensor of shape (batch, seq_len, dim_model).
         """
         x = self.layernorm.construct(hidden_states)
         if self.post_layer_norm:

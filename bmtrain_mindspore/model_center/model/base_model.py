@@ -7,5 +7,5 @@ from .config import Config
 class BaseModel(Cell):
     _CONFIG_TYPE: Type[Config]
 
-    def __init__(self, auto_prefix=True, flags=None):
-        super().__init__(auto_prefix, flags)
+    def __init__(self):
+        super().__init__()

@@ -233,6 +233,24 @@ def test_rotate():
     bms.print_rank(res.size)
     bms.print_rank(ops.sum(res>thr)*1.0 / res.size)
 
+def test_llama():
+    from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
+
+    config = LlamaConfig(
+        vocab_size=44,
+        num_layers=12,
+        dim_model=128,
+        dim_head=16,
+        dim_ff=512,
+        num_heads=8,
+    )
+    model = Llama(config)
+
+    n = 123
+    input_ids = ops.randint(0, config.vocab_size, size=(2, n,))
+    attention_mask = Tensor([45, 89])
+    res, _, _ = model.construct(input_ids=input_ids, attention_mask=attention_mask)
+    print(res)
 
 def main():
     try:
@@ -241,7 +259,7 @@ def main():
         print("init_distributed failed")
 
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    test_rotate()
+    test_llama()
 
 if __name__ == '__main__':
     main()
