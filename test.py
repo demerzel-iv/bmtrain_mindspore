@@ -211,6 +211,29 @@ def test_transformer():
     )
     bms.print_rank(res)
 
+def test_rotate():
+    from mindnlp.transformers.models.llama.modeling_llama import apply_rotary_pos_emb, LlamaRotaryEmbedding
+    dim=1024
+    rp = layer.RotaryEmbeddingESM(dim=dim,)
+    n = 1231
+    q = Tensor(np.random.normal(size=(1, 1, n, dim)), dtype=ms.float32)
+    k = Tensor(np.random.normal(size=(1, 1, n, dim)), dtype=ms.float32)
+    rq, rk = rp.construct(q, k)
+
+    rrp = LlamaRotaryEmbedding(dim, max_position_embeddings=1)
+    cos, sin = rrp(k, seq_len=n)
+    query_states, key_states = apply_rotary_pos_emb(q, k, cos, sin, ops.arange(n), unsqueeze_dim=0)
+
+    res = rq - query_states
+    #res = rq - sin
+    thr=1e-9
+    res[res < thr] = 0
+    bms.print_rank(res)
+    bms.print_rank(ops.sum(res>thr))
+    bms.print_rank(res.size)
+    bms.print_rank(ops.sum(res>thr)*1.0 / res.size)
+
+
 def main():
     try:
         bms.init_distributed()
@@ -218,7 +241,7 @@ def main():
         print("init_distributed failed")
 
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    test_transformer()
+    test_rotate()
 
 if __name__ == '__main__':
     main()
