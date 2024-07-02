@@ -20,8 +20,12 @@ class TransformerBlock(Cell):
         eps: float = 1e-5,
         dropout_p: float = None,
         post_layer_norm: bool = False,
+        rms_layer_norm: bool = False,
+        layer_id: int = None,
     ):
         super().__init__()
+        self.layer_id = layer_id
+        from ...global_var import rank
         self.self_att = AttentionBlock(
             dim_model=dim_model,
             dim_head=dim_head,
@@ -29,6 +33,7 @@ class TransformerBlock(Cell):
             dropout_p=dropout_p,
             norm_eps=eps,
             post_layer_norm=post_layer_norm,
+            rms_layer_norm=rms_layer_norm,
         )
         self.ffn = FFNBlock(
             dim_model=dim_model,
@@ -38,6 +43,7 @@ class TransformerBlock(Cell):
             dropout_p=dropout_p,
             norm_eps=eps,
             post_layer_norm=post_layer_norm,
+            rms_layer_norm=rms_layer_norm,
         )
     
     def construct(
@@ -80,6 +86,7 @@ class Encoder(Cell):
         eps: float = 1e-5,
         dropout_p: float = None,
         post_layer_norm: bool = False,
+        rms_layer_norm: bool = False,
     ):
         super().__init__()
         self.layers = nn.CellList([
@@ -92,12 +99,14 @@ class Encoder(Cell):
                 eps=eps,
                 dropout_p=dropout_p,
                 post_layer_norm=post_layer_norm,
+                rms_layer_norm=rms_layer_norm,
+                layer_id=i,
             ) for i in range(num_layers)
         ])
         self.output_layer_norm = LayerNorm(
             dim_norm=dim_model,
             eps=eps,
-            rms_layer_norm=False,
+            rms_layer_norm=rms_layer_norm,
         )
 
     def construct(

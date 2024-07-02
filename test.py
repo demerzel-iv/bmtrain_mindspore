@@ -11,7 +11,15 @@ from bmtrain_mindspore import DistributedParameter, DistributedModule
 from bmtrain_mindspore.model_center.layer import Embedding, Linear
 from bmtrain_mindspore.model_center import layer
 
-OUTPUT_PATH = '/root/output'
+OUTPUT_PATH = '/root/outputs'
+
+def waitme():
+    i=0
+    while not os.path.exists('/root/stop'):
+        import time
+        time.sleep(1)
+        print('wait', i)
+        i=i+1
 
 class Test(DistributedModule):
     def __init__(self, a, b):
@@ -250,7 +258,19 @@ def test_llama():
     input_ids = ops.randint(0, config.vocab_size, size=(2, n,))
     attention_mask = Tensor([45, 89])
     res, _, _ = model.construct(input_ids=input_ids, attention_mask=attention_mask)
-    print(res)
+    bms.print_rank(res)
+    bms.save(model, '/root/output/test.ckpt')
+
+def test_pretrained_llama():
+    from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
+    model_path = '/root/outputs/llama2-7b-bms'
+    model = Llama.from_pretrained(model_path)
+
+    n = 123
+    input_ids = ops.randint(0, model.config.vocab_size, size=(2, n,))
+    attention_mask = Tensor([45, 89])
+    res, _, _ = model.construct(input_ids=input_ids, attention_mask=attention_mask)
+    bms.print_rank(res)
 
 def main():
     try:
@@ -259,7 +279,7 @@ def main():
         print("init_distributed failed")
 
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    test_llama()
+    test_pretrained_llama()
 
 if __name__ == '__main__':
     main()

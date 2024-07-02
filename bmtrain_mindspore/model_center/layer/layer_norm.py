@@ -24,7 +24,7 @@ class LayerNorm(DistributedModule):
         self.layer_norm_ops = ops.LayerNorm(begin_norm_axis=-1, begin_params_axis=-1, epsilon=eps)
 
         # initialize the weight
-        init_tensor = Tensor(initializer(init=init, shape=(dim_norm,)).numpy()) # convert to numpy to avoid a bug in `initializer`
+        init_tensor = initializer(init=init, shape=(dim_norm,))
         self.weight = DistributedParameter(init_tensor)
         self.bias = DistributedParameter(
             Tensor(np.zeros(shape=(dim_norm,)), dtype=ms.float32)

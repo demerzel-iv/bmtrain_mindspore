@@ -31,6 +31,7 @@ class Llama(BaseModel):
             eps=config.eps,
             dropout_p=None,
             post_layer_norm=False,
+            rms_layer_norm=True,
         )
         self.output_projection = Linear(
             dim_in=config.dim_model,

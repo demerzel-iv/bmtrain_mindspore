@@ -24,7 +24,6 @@ def convert_model_to_param_dict(model: Cell) -> Dict[str, Tuple[Tuple[int], str,
             value = param.gather()
         else:
             assert isinstance(param, Parameter)
-            print_rank('warning: all parameters should be `DistributedParameter`')
             value = param.value()
         param_dict[name] = (
             value.shape,
@@ -38,7 +37,13 @@ def save(model: Cell, save_path: str):
     _exec_save(save_path, param_dict)
 
 def load(model: Cell, load_path: str, strict: bool = False):
+    from .global_var import rank
+    print('begin - {}'.format(rank()))
     param_dict: Dict[str, Parameter] = load_checkpoint(load_path)
+    print('finload - {}'.format(rank()))
     for key in param_dict:
+        print('distribute - {} - {}'.format(key, rank()))
         param_dict[key] = DistributedParameter(param_dict[key].value())
+    print('loadintonet - {}'.format(rank()))
     load_param_into_net(model, param_dict, strict)
+    print('end - {}'.format(rank()))

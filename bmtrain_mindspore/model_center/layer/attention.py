@@ -156,12 +156,13 @@ class AttentionBlock(Cell):
         num_heads_kv: int = -1,
         norm_eps: float = 1e-5,
         post_layer_norm: bool = False,
+        rms_layer_norm: bool = False,
     ):
         super().__init__()
         self.layernorm = LayerNorm(
             dim_norm=dim_model,
             eps=norm_eps,
-            rms_layer_norm=False,
+            rms_layer_norm=rms_layer_norm,
         )
         self.attention = Attention(
             dim_in=dim_model,

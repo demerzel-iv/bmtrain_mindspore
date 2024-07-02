@@ -21,7 +21,7 @@ class Embedding(DistributedModule):
         self.dim_model = embedding_size
         self.padding_idx = padding_idx
         # initialize the weight
-        init_tensor = Tensor(initializer(init=init, shape=(vocab_size, embedding_size)).numpy()) # convert to numpy to avoid a bug in `initializer`
+        init_tensor = initializer(init=init, shape=(vocab_size, embedding_size))
         self.weight = DistributedParameter(init_tensor)
 
     def construct(self, ids: Tensor) -> Tensor:
