@@ -16,6 +16,8 @@ class TransformerBlock(Cell):
         dim_ff: int,
         num_heads: int,
         dim_head: int,
+        pos_bias_type: str = 'none',
+        attn_scale: bool = False,
         activate_fn: str = 'gated_silu',
         eps: float = 1e-5,
         dropout_p: float = None,
@@ -25,11 +27,12 @@ class TransformerBlock(Cell):
     ):
         super().__init__()
         self.layer_id = layer_id
-        from ...global_var import rank
         self.self_att = AttentionBlock(
             dim_model=dim_model,
             dim_head=dim_head,
             num_heads=num_heads,
+            pos_bias_type=pos_bias_type,
+            attn_scale=attn_scale,
             dropout_p=dropout_p,
             norm_eps=eps,
             post_layer_norm=post_layer_norm,
@@ -82,6 +85,8 @@ class Encoder(Cell):
         dim_ff: int,
         num_heads: int,
         dim_head: int,
+        pos_bias_type: str = 'none',
+        attn_scale: bool = False,
         activate_fn: str = 'gated_silu',
         eps: float = 1e-5,
         dropout_p: float = None,
@@ -95,6 +100,8 @@ class Encoder(Cell):
                 dim_ff=dim_ff,
                 num_heads=num_heads,
                 dim_head=dim_head,
+                pos_bias_type=pos_bias_type,
+                attn_scale=attn_scale,
                 activate_fn=activate_fn,
                 eps=eps,
                 dropout_p=dropout_p,

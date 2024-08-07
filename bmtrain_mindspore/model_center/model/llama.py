@@ -27,6 +27,8 @@ class Llama(BaseModel):
             dim_ff=config.dim_ff,
             num_heads=config.num_heads,
             dim_head=config.dim_head,
+            pos_bias_type='rotary',
+            attn_scale=True,
             activate_fn=config.activate_fn,
             eps=config.eps,
             dropout_p=None,
@@ -57,6 +59,9 @@ class Llama(BaseModel):
         total_len = input_len
         if past_key_values != None:
             total_len += past_key_values[0][0].shape[-2]
+
+        if attention_mask == None:
+            attention_mask = ops.fill(shape=(batch_size,), value=total_len, type=ms.int32)
         
         if len(attention_mask.shape) == 3:
             attention_mask_2d = attention_mask
