@@ -24,7 +24,7 @@ class DistributedParameter(Parameter):
         x = x.reshape(-1)
         left_bound = rank * num_per_device
         right_bound = (rank + 1) * num_per_device
-        x = x[left_bound: right_bound]
+        x = x[left_bound: right_bound]#.copy()
         # ops.AllGather requires tensors on each device to have the same size
         if x.numel() < num_per_device:
             num_to_pad = num_per_device - x.numel()

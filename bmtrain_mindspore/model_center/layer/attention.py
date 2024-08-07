@@ -101,9 +101,9 @@ class Attention(Cell):
 
         # concat past_key_value and update len_k
         if past_key_value is not None:
-            h_k = ops.cat([past_key_value[0], h_k], dim=-2)
-            h_v = ops.cat([past_key_value[1], h_v], dim=-2)
-            len_k = h_k.size(-2)
+            h_k = ops.cat([past_key_value[0], h_k], axis=-2)
+            h_v = ops.cat([past_key_value[1], h_v], axis=-2)
+            len_k = h_k.shape[-2]
         # for future calculation
         current_key_value = (h_k, h_v) if use_cache else None
 

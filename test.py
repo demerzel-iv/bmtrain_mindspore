@@ -263,14 +263,49 @@ def test_llama():
 
 def test_pretrained_llama():
     from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
+    from mindnlp.transformers import PreTrainedTokenizerFast, AutoTokenizer
+
     model_path = '/root/outputs/llama2-7b-bms'
     model = Llama.from_pretrained(model_path)
 
-    n = 123
-    input_ids = ops.randint(0, model.config.vocab_size, size=(2, n,))
-    attention_mask = Tensor([45, 89])
-    res, _, _ = model.construct(input_ids=input_ids, attention_mask=attention_mask)
-    bms.print_rank(res)
+    print('memory occupation after loading - {} - {} -'.format(ms.hal.memory_allocated(), bms.rank()))
+
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_path)
+    s = "The sun sets in the west, painting the sky with"
+    x = tokenizer.encode(s, return_tensors='ms') # bs, n
+
+    hidden_states, past_key_values, logits = model.construct(input_ids=x, attention_mask=None, output_logits=True)
+
+    print('memory occupation after forwarding - {} - {} -'.format(ms.hal.memory_allocated(), bms.rank()))
+    #next_tok = logits[0, -1].argmax().reshape(1,1)
+
+def test_generate():
+    from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
+    from mindnlp.transformers import PreTrainedTokenizerFast, AutoTokenizer
+    from tqdm import tqdm
+
+    model_path = '/root/outputs/llama2-7b-bms'
+    model = Llama.from_pretrained(model_path)
+    print('memory occupation after loading - {} - {} -'.format(ms.hal.memory_allocated(), bms.rank()))
+
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_path)
+    s = "The sun sets in the west, painting the sky with"
+    x = tokenizer.encode(s, return_tensors='ms') # bs, n
+
+    #hidden_states, past_key_values, logits = model.construct(input_ids=x, attention_mask=None, output_logits=True)
+    print('begin forwarding - {} - {} -'.format(ms.hal.memory_allocated(), bms.rank()))
+    hidden_states, past_key_values, logits = model.construct(x, use_cache=True)
+    next_tok = logits[0, -1].argmax().reshape(1,1)
+    tok_list = (x, next_tok)
+
+    for i in (range(20)):
+        bms.print_rank('a', i)
+        hidden_states, past_key_values, logits = model.construct(next_tok, use_cache=True, past_key_values=past_key_values)
+        next_tok = logits[0, -1].argmax().reshape(1,1)
+        tok_list += (next_tok,)
+        
+        res = ops.cat(tok_list, axis=-1)
+        print(tokenizer.convert_ids_to_tokens(res[0]))
 
 def main():
     try:
@@ -279,7 +314,8 @@ def main():
         print("init_distributed failed")
 
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    test_pretrained_llama()
+    #test_pretrained_llama()
+    test_generate()
 
 if __name__ == '__main__':
     main()

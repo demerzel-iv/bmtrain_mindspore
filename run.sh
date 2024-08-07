@@ -4,5 +4,12 @@ else
     n_works=$1
 fi
 
-mpirun --allow-run-as-root -np ${n_works} python3 test.py
+
+if [[ -z $2 ]]; then 
+    exe_file=test.py
+else
+    exe_file=$2
+fi
+
+mpirun --allow-run-as-root -np ${n_works} python3 ${exe_file}
 #msrun --worker_num ${n_works} --local_worker_num ${n_works} --log_dir=msrun_log test.py

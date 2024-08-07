@@ -90,4 +90,6 @@ class Llama(BaseModel):
             past_key_values=past_key_values
         )
         logits = self.output_projection(hidden_states) if output_logits else None
+        if not use_cache:
+            current_key_values = None
         return hidden_states, current_key_values, logits
