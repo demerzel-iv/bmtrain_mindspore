@@ -1,6 +1,6 @@
 ## 环境说明
 
-版本： mindspore==2.3.0.20240228
+版本： mindspore==2.3.0rc1
 
 代码修改：
 
@@ -36,12 +36,23 @@
         new_type = cls._get_base_class(input_class)
 ```
 
-## 现有功能
+## 已完成
 
-- 分布式tensor存储
-- 前向计算
+- ZeRO-3优化
+    - 分布式模型存储
+    - 分布式模型的保存/加载
+    - 前向/反向传播计算正确性验证
+- ModelCenter
+    - 模型组件：Linear, Embedding, LayerNorm, Attention, FeedForward, TransformerBlock
+    - LLaMA
+        - 完整模型代码
+        - huggingface的ckpt到mindspore的ckpt的转换脚本
+        - 正确性验证
 
-## 待完成功能
+## TODOLIST
 
-- 反向传播计算
-- 迁移LLaMA模型，验证正确性
+- optimizer
+    - Adam优化器
+    - 训练管理器
+- 验证模型训练能正确收敛
+- checkpoint优化
