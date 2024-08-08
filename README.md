@@ -47,14 +47,12 @@
     - LLaMA
         - 完整模型代码
         - huggingface的ckpt到mindspore的ckpt的转换脚本
+        - 正确性验证
 
 ## TODOLIST
 
-- 迁移LLaMA模型(LLaMA2-7B)，验证正确性
-    - 正确性验证：前向/反向传播
-- ZeRO-3优化
-    - 分布式优化器
 - optimizer
     - Adam优化器
-    - 管理器
+    - 训练管理器
 - 验证模型训练能正确收敛
+- checkpoint优化
