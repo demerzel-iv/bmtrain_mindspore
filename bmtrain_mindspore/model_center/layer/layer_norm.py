@@ -43,6 +43,7 @@ class LayerNorm(DistributedModule):
         else:
             # RMS layer norm
             old_dtype = x.dtype
+            #ms.mint.mean()
             variance = x.to(ms.float32).pow(2).mean(axis=-1, keep_dims=True)
             x = x * ops.rsqrt(variance + self.eps)
             return x.to(old_dtype) * self.weight

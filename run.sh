@@ -11,5 +11,5 @@ else
     exe_file=$2
 fi
 
-mpirun --allow-run-as-root -np ${n_works} python3 ${exe_file}
+taskset -c 0-23 mpirun --allow-run-as-root -np ${n_works} python3 ${exe_file}
 #msrun --worker_num ${n_works} --local_worker_num ${n_works} --log_dir=msrun_log test.py

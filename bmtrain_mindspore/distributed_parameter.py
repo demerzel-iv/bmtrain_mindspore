@@ -40,7 +40,8 @@ class DistributedParameter(Parameter):
 
     def gather(self) -> Tensor:
         x: Tensor = self.all_gather_ops(self)
-        x = x[:self._original_size]
+        #x = x[:self._original_size]
+        ms.mint.narrow(x, 0, 0, self._original_size)
         x = x.reshape(self._original_shape)
         return x
 

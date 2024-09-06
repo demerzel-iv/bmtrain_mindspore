@@ -48,7 +48,7 @@ class Llama(BaseModel):
         inputs_embeds: Tensor = None,
         use_cache: bool = False,
         past_key_values: Tuple[Tuple[Tensor]] = None,
-        output_logits: bool = True,
+        output_logits: bool = False,
     ):
         if input_ids != None:
             batch_size, input_len = input_ids.shape

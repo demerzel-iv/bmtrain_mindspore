@@ -166,3 +166,6 @@ play*
 *.code-workspace
 msrun_log
 ir
+
+*.csv
+*.json
