@@ -1,7 +1,8 @@
 import numpy as np
 import mindspore as ms
 
-from mindspore import ops, Tensor, nn
+from mindspore import Tensor, nn
+from mindnlp.core import ops
 from mindspore.nn import Cell
 
 
@@ -30,7 +31,7 @@ class RotaryEmbeddingESM(Cell):
 
     def rotate_half(self, x: Tensor) -> Tensor:
         x1, x2 = x.chunk(2, axis=-1)
-        return ops.cat((-x2, x1), axis=-1)
+        return ops.cat((-x2, x1), dim=-1)
     
     def apply_rotary_pos_emb(self, x: Tensor, right_bound: int) -> Tensor:
         length = x.shape[-2]
@@ -49,7 +50,7 @@ class RotaryEmbeddingESM(Cell):
         self.seq_len_cached = n
         t: Tensor = ops.arange(n).type_as(self.inv_freq) * self.distance_scale
         freqs = t.view(n, 1) @ self.inv_freq.view(1, -1) # (n, dim/2)
-        emb = ops.cat((freqs, freqs), axis=-1) # (n, dim)
+        emb = ops.cat((freqs, freqs), dim=-1) # (n, dim)
         
         self.cos_cached = emb.cos()
         self.sin_cached = emb.sin()

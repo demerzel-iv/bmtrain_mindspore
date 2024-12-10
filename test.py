@@ -4,8 +4,12 @@ import numpy as np
 import mindspore as ms
 import bmtrain_mindspore as bms
 
-from mindspore import nn, ops
+from mindspore import nn
+from mindnlp.core import ops
 from mindspore import Tensor, Parameter
+from mindspore.train.summary import SummaryRecord
+
+from mindnlp.engine import Trainer
 
 from mindspore._c_expression import _framework_profiler_step_start
 from mindspore._c_expression import _framework_profiler_step_end
@@ -34,6 +38,15 @@ def test():
     out = grad_fn(x)
 
     print('-----rank-{}, [{}]------'.format(bms.rank(), out))
+
+def testbug():
+    bms.init_distributed()
+    from bmtrain_mindspore.model_center.layer import LayerNorm, Embedding
+    l = Embedding(10, 7)
+    u = ms.Tensor([[2,3,4]])
+    print(u)
+    v = l.construct(u)
+    print(v)
 
 def test_llama():
     from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
@@ -90,30 +103,34 @@ def test_generate():
 
     #hidden_states, past_key_values, logits = model.construct(input_ids=x, attention_mask=None, output_logits=True)
     print('begin forwarding - {} - {} -'.format(ms.hal.memory_allocated(), bms.rank()))
-    _framework_profiler_step_start()
+
+    #_framework_profiler_step_start()
     hidden_states, past_key_values, logits = model.construct(x, use_cache=True, output_logits=True)
-    _framework_profiler_step_end()
+    #_framework_profiler_step_end()
+
     next_tok = logits[0, -1].argmax().reshape(1,1)
     tok_list = (x, next_tok)
     print(next_tok)
 
-    return
+    for i in tqdm(range(20)):
+        hidden_states, past_key_values, logits = model.construct(
+            next_tok,
+            use_cache=True,
+            past_key_values=past_key_values,
+            output_logits=True
+        )
+        next_tok = logits[0, -1].argmax().reshape(1,1)
+        tok_list += (next_tok,)
 
-    with ms.SummaryRecord('/root/test_llama/test_sum/', network=model) as summary_record:
-        for i in (range(20)):
-            hidden_states, past_key_values, logits = model.construct(next_tok, use_cache=True, past_key_values=past_key_values)
-            next_tok = logits[0, -1].argmax().reshape(1,1)
-            tok_list += (next_tok,)
+        prob, ids = logits[0, -1].softmax(axis=-1).topk(k=6)
+        
+        res = ops.cat(tok_list, dim=-1)
+        print('i=', i)
 
-            prob, ids = logits[0, -1].softmax(axis=-1).topk(k=6)
-            if bms.rank() == 0:
-                summary_record.add_value('tensor', 'probability', prob)
-                summary_record.add_value('tensor', 'ids', ids)
-                summary_record.record(i)
-            
-            res = ops.cat(tok_list, axis=-1)
-            print('i=', i)
     print(tokenizer.convert_ids_to_tokens(res[0]))
+
+def test_train():
+    pass
 
 def main():
     try:
@@ -124,6 +141,7 @@ def main():
     ms.set_context(mode=ms.PYNATIVE_MODE)
     #test_pretrained_llama()
     test_generate()
+    #testbug()
 
 if __name__ == '__main__':
     main()

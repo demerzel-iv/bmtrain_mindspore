@@ -3,7 +3,8 @@ import numpy as np
 import mindspore as ms
 
 from typing import Callable, Tuple
-from mindspore import ops, Tensor, nn
+from mindspore import Tensor, nn
+from mindnlp.core import ops
 from mindspore.nn import Cell
 
 from .linear import Linear
@@ -101,8 +102,8 @@ class Attention(Cell):
 
         # concat past_key_value and update len_k
         if past_key_value is not None:
-            h_k = ops.cat([past_key_value[0], h_k], axis=-2)
-            h_v = ops.cat([past_key_value[1], h_v], axis=-2)
+            h_k = ops.cat([past_key_value[0], h_k], dim=-2)
+            h_v = ops.cat([past_key_value[1], h_v], dim=-2)
             len_k = h_k.shape[-2]
         # for future calculation
         current_key_value = (h_k, h_v) if use_cache else None
@@ -124,7 +125,7 @@ class Attention(Cell):
             attention_mask.view(batch_size, 1, len_q, len_k)==False,
             Tensor(float('-inf'), dtype=score.dtype)
         )
-        score = ops.softmax(score, axis=-1)
+        score = ops.softmax(score, dim=-1)
         # avoid nan in softmax
         score = ops.masked_fill(
             score,

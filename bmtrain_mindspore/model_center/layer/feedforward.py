@@ -1,8 +1,10 @@
 import numpy as np
 import mindspore as ms
 
-from mindspore import ops, Tensor, nn
+from mindspore import Tensor, nn
+from mindnlp.core import ops
 from mindspore.nn import Cell
+from mindnlp.core.nn import functional as F
 
 from .linear import Linear
 from .layer_norm import LayerNorm
@@ -31,11 +33,11 @@ class DenseACT(Cell):
         ) if self.gated else None
 
         if activate_fn == "relu":
-            self.act = ops.relu
+            self.act = F.relu
         elif activate_fn == "gelu":
-            self.act = ops.gelu
+            self.act = F.gelu
         elif activate_fn == "silu":
-            self.act = ops.silu
+            self.act = F.silu
         else:
             raise ValueError("Unsupported activation function: {}".format(activate_fn))
 

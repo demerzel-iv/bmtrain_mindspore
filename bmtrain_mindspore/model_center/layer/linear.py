@@ -3,7 +3,8 @@ import mindspore as ms
 
 from typing import Union
 from mindspore.common.initializer import initializer
-from mindspore import ops, Tensor, nn
+from mindspore import Tensor, nn
+from mindnlp.core import ops
 
 from ...distributed_module import DistributedModule
 from ...distributed_parameter import DistributedParameter

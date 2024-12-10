@@ -3,7 +3,9 @@ import mindspore.nn as nn
 
 from typing import Union
 from mindspore.common.initializer import initializer
-from mindspore import ops, Tensor
+from mindspore import Tensor
+from mindnlp.core import ops
+from mindnlp.core.nn import functional as F
 
 from ...distributed_module import DistributedModule
 from ...distributed_parameter import DistributedParameter
@@ -31,7 +33,8 @@ class Embedding(DistributedModule):
         Returns:
             A tensor of shape (batch_size, seq_len, embedding_size) with values set to 0 where `ids` are equal to `padding_idx`.
         """
-        embed = ops.gather(self.weight, ids, axis=0)
-        if self.padding_idx != None:
-            embed[ids == self.padding_idx] = 0.
+        #embed = ops.gather(self.weight, index=ids, dim=0)
+        embed = F.embedding(ids, self.weight, self.padding_idx)
+        #if self.padding_idx != None:
+        #    embed[ids == self.padding_idx] = 0.
         return embed

@@ -4,7 +4,9 @@ import mindspore as ms
 
 from typing import Dict, Tuple
 from collections import OrderedDict
-from mindspore import Tensor, Parameter, load_checkpoint, load_param_into_net, ops
+from mindspore import Tensor, Parameter, load_checkpoint, load_param_into_net
+from mindspore import ops as raw_ops
+from mindnlp.core import ops
 from mindspore.nn import Cell
 from mindspore.train.serialization import _exec_save
 
@@ -42,7 +44,7 @@ def save(model: Cell, save_path: str):
     _exec_save(save_path, param_dict)
 
 def load(model: Cell, load_path: str, strict: bool = False):
-    broad_cast = ops.Broadcast(root_rank=0)
+    broad_cast = raw_ops.Broadcast(root_rank=0)
     if rank() == 0:
         from time import time
         print('begin loading - rank {}'.format(rank()))
@@ -68,14 +70,14 @@ def load(model: Cell, load_path: str, strict: bool = False):
         print('wait for loading - rank {}'.format(rank()))
         meta_data_size = Tensor(0, dtype=ms.int32)
         meta_data_size, = broad_cast((meta_data_size,))
-        meta_data_ms: Tensor = ops.zeros(meta_data_size, dtype=ms.int8)
+        meta_data_ms: Tensor = ops.zeros(int(meta_data_size), dtype=ms.int8)
         meta_data_ms, = broad_cast((meta_data_ms,))
         meta_data = deserialize_from_numpy(meta_data_ms.numpy())
 
         param_dict = {}
         for name in meta_data:
             shape, dtype = meta_data[name]
-            value = ops.zeros(size=shape, dtype=dtype)
+            value = ops.zeros(shape, dtype=dtype)
             value, = broad_cast((value,))
             param_dict[name] = value
          

@@ -2,7 +2,8 @@ import math
 import mindspore as ms
 
 from typing import Tuple
-from mindspore import ops
+from mindspore import ops as raw_ops
+from mindnlp.core import ops
 from mindspore import Tensor, Parameter
 
 from .utils import print_rank
@@ -13,7 +14,7 @@ PAD_VALUE = 0
 class DistributedParameter(Parameter):
     _original_size: int
     _original_shape : Tuple
-    all_gather_ops: ops.AllGather
+    all_gather_ops: raw_ops.AllGather
 
     def __new__(cls, x: Tensor, *args, **kwargs):
         num_tot = x.numel()
@@ -34,14 +35,14 @@ class DistributedParameter(Parameter):
 
         obj._original_size = num_tot
         obj._original_shape = original_shape
-        obj.all_gather_ops = ops.AllGather()
+        obj.all_gather_ops = raw_ops.AllGather()
 
         return obj
 
     def gather(self) -> Tensor:
         x: Tensor = self.all_gather_ops(self)
         #x = x[:self._original_size]
-        ms.mint.narrow(x, 0, 0, self._original_size)
+        x = ms.mint.narrow(x, 0, 0, self._original_size)
         x = x.reshape(self._original_shape)
         return x
 

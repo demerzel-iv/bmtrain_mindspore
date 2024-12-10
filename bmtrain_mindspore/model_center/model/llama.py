@@ -1,7 +1,9 @@
 import mindspore as ms
 
 from typing import List, Tuple
-from mindspore import ops, Tensor, nn
+from mindspore import Tensor, nn
+from mindnlp.core import ops
+from mindnlp.core.nn import functional as F
 
 from .base_model import BaseModel
 from .config import LlamaConfig
@@ -61,7 +63,8 @@ class Llama(BaseModel):
             total_len += past_key_values[0][0].shape[-2]
 
         if attention_mask == None:
-            attention_mask = ops.fill(shape=(batch_size,), value=total_len, type=ms.int32)
+            attention_mask = ops.full(size=(batch_size,), fill_value=total_len, dtype=ms.int32)
+            #attention_mask = ops.fill(shape=(batch_size,), value=total_len, type=ms.int32)
         
         if len(attention_mask.shape) == 3:
             attention_mask_2d = attention_mask
