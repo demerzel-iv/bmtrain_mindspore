@@ -4,6 +4,7 @@ import shutil
 import argparse
 
 from collections import OrderedDict
+from mindnlp.core.serialization import safe_save_file
 from mindnlp.transformers.modeling_utils import load_state_dict
 from mindspore.train.serialization import _exec_save
 
@@ -42,7 +43,8 @@ def convert_model(source_path: str, target_path: str):
         if file.endswith('.bin'):
             old_ckpt |= load_state_dict(os.path.join(source_path, file))
 
-    new_ckpt = OrderedDict()
+    #new_ckpt = OrderedDict()
+    new_ckpt = {}
 
     new_ckpt['input_embedding.weight'] = old_ckpt['model.embed_tokens.weight']
     new_ckpt['encoder.output_layer_norm.weight'] = old_ckpt['model.norm.weight']
@@ -58,17 +60,19 @@ def convert_model(source_path: str, target_path: str):
         new_ckpt[f'encoder.layers.{i}.self_att.attention.project_v.weight']     = old_ckpt[f'model.layers.{i}.self_attn.v_proj.weight'].transpose()
         new_ckpt[f'encoder.layers.{i}.self_att.attention.attention_out.weight'] = old_ckpt[f'model.layers.{i}.self_attn.o_proj.weight'].transpose()
 
-    # adapt the format for saving
-    new_ckpt_for_save = OrderedDict()
-    for k, v in new_ckpt.items():
-        value = v.value()
-        new_ckpt_for_save[k] = (
-            value.shape,
-            str(value.dtype),
-            value
-        )
     os.makedirs(target_path, exist_ok=True)
-    _exec_save(os.path.join(target_path, 'mindspore_model.ckpt'), new_ckpt_for_save)
+    # adapt the format for saving
+    #new_ckpt_for_save = OrderedDict()
+    #for k, v in new_ckpt.items():
+    #    value = v.value()
+    #    new_ckpt_for_save[k] = (
+    #        value.shape,
+    #        str(value.dtype),
+    #        value
+    #    )
+    #_exec_save(os.path.join(target_path, 'mindspore_model.ckpt'), new_ckpt_for_save)
+
+    safe_save_file(new_ckpt, os.path.join(target_path, 'mindspore_model.safetensors'))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

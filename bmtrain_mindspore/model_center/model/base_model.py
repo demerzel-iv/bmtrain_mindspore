@@ -16,5 +16,5 @@ class BaseModel(Cell):
         if config == None:
             config = cls._CONFIG_TYPE.from_pretrained(pretrained_model_path, **kwargs)
         model = cls(config)
-        load(model, os.path.join(pretrained_model_path, 'mindspore_model.ckpt'), strict=True)
+        load(model, os.path.join(pretrained_model_path, 'mindspore_model.safetensors'), strict=True)
         return model

@@ -1,3 +1,5 @@
+export MS_ENABLE_RUNTIME_PROFILER=1
+
 if [[ -z $1 ]]; then 
     n_works=1
 else
