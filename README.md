@@ -1,6 +1,6 @@
 ## 环境说明
 
-版本： mindspore==2.3.0rc1
+版本： mindspore==2.5.0
 
 代码修改：
 
@@ -22,17 +22,17 @@
         return new_type
 ```
 
-然后将`Parameter.__new__`的第3，4行从
+然后将`Parameter.__new__`的第4，5行从
 
 ```python
-        input_class, *class_init_args = Parameter._get_parameter_new_args(default_input, rc)
+        input_class, *class_init_args = Parameter._get_parameter_new_args(default_input, rc, init_param)
         new_type = Parameter._get_base_class(input_class)
 ```
 
 改成
 
 ```python
-        input_class, *class_init_args = cls._get_parameter_new_args(default_input, rc)
+        input_class, *class_init_args = cls._get_parameter_new_args(default_input, rc, init_param)
         new_type = cls._get_base_class(input_class)
 ```
 

@@ -19,9 +19,11 @@ class Llama(BaseModel):
         self.input_embedding = Embedding(
             vocab_size=config.vocab_size,
             embedding_size=config.dim_model,
+            dtype=config.dtype,
         )
         self.position_bias = RotaryEmbeddingESM(
             dim=config.dim_head,
+            dtype=config.dtype,
         )
         self.encoder = Encoder(
             num_layers=config.num_layers,
@@ -36,11 +38,13 @@ class Llama(BaseModel):
             dropout_p=None,
             post_layer_norm=False,
             rms_layer_norm=True,
+            dtype=config.dtype,
         )
         self.output_projection = Linear(
             dim_in=config.dim_model,
             dim_out=config.vocab_size,
             bias=False,
+            dtype=config.dtype,
         )
 
     def construct(

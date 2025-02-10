@@ -31,6 +31,8 @@ class DistributedParameter(Parameter):
             num_to_pad = num_per_device - x.numel()
             x = ops.cat((x, Tensor([PAD_VALUE] * num_to_pad, dtype=x.dtype)))
 
+        x = x.numpy()
+
         obj: DistributedParameter = super().__new__(cls, x, *args, **kwargs)
 
         obj._original_size = num_tot
@@ -41,8 +43,8 @@ class DistributedParameter(Parameter):
 
     def gather(self) -> Tensor:
         x: Tensor = self.all_gather_ops(self)
-        #x = x[:self._original_size]
         x = ms.mint.narrow(x, 0, 0, self._original_size)
+        #ms.mint.distributed.all_gather()
         x = x.reshape(self._original_shape)
         return x
 

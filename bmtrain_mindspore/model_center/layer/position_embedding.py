@@ -18,12 +18,13 @@ class RotaryEmbeddingESM(Cell):
         dim: int, 
         base: float = 10000,
         distance_scale: float = 1,
+        dtype = ms.float32,
     ):
         super().__init__()
         self.distance_scale = distance_scale
 
         # Generate and save the inverse frequency buffer (non trainable)
-        self.inv_freq: Tensor = base ** (- ops.arange(0, dim, 2, dtype=ms.float32) / dim) # (dim/2, )
+        self.inv_freq: Tensor = base ** (- ops.arange(0, dim, 2, dtype=dtype) / dim) # (dim/2, )
 
         self.seq_len_cached = -1
         self.cos_cached = None

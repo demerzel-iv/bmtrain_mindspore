@@ -25,6 +25,7 @@ class TransformerBlock(Cell):
         post_layer_norm: bool = False,
         rms_layer_norm: bool = False,
         layer_id: int = None,
+        dtype = ms.float32,
     ):
         super().__init__()
         self.layer_id = layer_id
@@ -38,6 +39,7 @@ class TransformerBlock(Cell):
             norm_eps=eps,
             post_layer_norm=post_layer_norm,
             rms_layer_norm=rms_layer_norm,
+            dtype=dtype,
         )
         self.ffn = FFNBlock(
             dim_model=dim_model,
@@ -48,6 +50,7 @@ class TransformerBlock(Cell):
             norm_eps=eps,
             post_layer_norm=post_layer_norm,
             rms_layer_norm=rms_layer_norm,
+            dtype=dtype,
         )
     
     def construct(
@@ -93,6 +96,7 @@ class Encoder(Cell):
         dropout_p: float = None,
         post_layer_norm: bool = False,
         rms_layer_norm: bool = False,
+        dtype = ms.float32,
     ):
         super().__init__()
         self.layers = nn.CellList([
@@ -109,12 +113,14 @@ class Encoder(Cell):
                 post_layer_norm=post_layer_norm,
                 rms_layer_norm=rms_layer_norm,
                 layer_id=i,
+                dtype=dtype,
             ) for i in range(num_layers)
         ])
         self.output_layer_norm = LayerNorm(
             dim_norm=dim_model,
             eps=eps,
             rms_layer_norm=rms_layer_norm,
+            dtype=dtype,
         )
 
     def construct(

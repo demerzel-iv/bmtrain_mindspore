@@ -21,6 +21,7 @@ class Attention(Cell):
         attn_scale: bool = False,
         dropout_p: float = None,
         num_heads_kv: int = -1,
+        dtype = ms.float32,
     ):
         super().__init__()
         dim_out = dim_out if dim_out != None else dim_in
@@ -38,21 +39,25 @@ class Attention(Cell):
             dim_in=dim_in,
             dim_out=num_heads * dim_head,
             bias=False,
+            dtype=dtype,
         )
         self.project_k = Linear(
             dim_in=dim_in,
             dim_out=num_heads_kv * dim_head,
             bias=False,
+            dtype=dtype,
         )
         self.project_v = Linear(
             dim_in=dim_in,
             dim_out=num_heads_kv * dim_head,
             bias=False,
+            dtype=dtype,
         )
         self.attention_out = Linear(
             dim_in=num_heads * dim_head,
             dim_out=dim_out,
             bias=False,
+            dtype=dtype,
         )
         self.dropout = nn.Dropout(p=dropout_p) if dropout_p != None else None
 
@@ -158,12 +163,14 @@ class AttentionBlock(Cell):
         norm_eps: float = 1e-5,
         post_layer_norm: bool = False,
         rms_layer_norm: bool = False,
+        dtype = ms.float32,
     ):
         super().__init__()
         self.layernorm = LayerNorm(
             dim_norm=dim_model,
             eps=norm_eps,
             rms_layer_norm=rms_layer_norm,
+            dtype=dtype,
         )
         self.attention = Attention(
             dim_in=dim_model,
@@ -174,6 +181,7 @@ class AttentionBlock(Cell):
             attn_scale=attn_scale,
             dropout_p=dropout_p,
             num_heads_kv=num_heads_kv,
+            dtype=dtype,
         )
         self.dropout = nn.Dropout(p=dropout_p) if dropout_p != None else None
         self.post_layer_norm = post_layer_norm

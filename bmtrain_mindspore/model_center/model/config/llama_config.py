@@ -1,3 +1,5 @@
+import mindspore as ms
+
 from .config import Config
 
 class LlamaConfig(Config):
@@ -11,6 +13,7 @@ class LlamaConfig(Config):
         num_heads: int,
         activate_fn: str = 'gated_silu',
         eps: float = 1e-6,
+        dtype: str = 'fp16'
     ):
         super().__init__()
         self.vocab_size = vocab_size
@@ -21,3 +24,4 @@ class LlamaConfig(Config):
         self.num_heads = num_heads
         self.activate_fn = activate_fn
         self.eps = eps
+        self.dtype = {'fp16': ms.float16}.get(dtype)

@@ -16,15 +16,16 @@ class Linear(DistributedModule):
         dim_out: int,
         bias: bool = False,
         init = 'normal',
+        dtype = ms.float32,
     ):
         super().__init__()
         self.dim_in = dim_in
         self.dim_out = dim_out
         # initialize the weight
-        init_tensor = initializer(init=init, shape=(dim_in, dim_out))
+        init_tensor = initializer(init=init, shape=(dim_in, dim_out), dtype=dtype)
         self.weight = DistributedParameter(init_tensor)
         self.bias = DistributedParameter(
-            Tensor(np.zeros(shape=(dim_out,)), dtype=ms.float32)
+            Tensor(np.zeros(shape=(dim_out,)), dtype=dtype)
         ) if bias else None
 
     def construct(self, x: Tensor) -> Tensor:

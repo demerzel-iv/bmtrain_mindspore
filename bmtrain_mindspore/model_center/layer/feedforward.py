@@ -16,6 +16,7 @@ class DenseACT(Cell):
         dim_ff : int,
         activate_fn : str = "silu",
         bias = False,
+        dtype = ms.float32,
     ):
         super().__init__()
         self.gated = 'gated_' in activate_fn
@@ -25,11 +26,13 @@ class DenseACT(Cell):
             dim_in=dim_in,
             dim_out=dim_ff,
             bias=bias,
+            dtype=dtype,
         )
         self.w1 = Linear(
             dim_in=dim_in,
             dim_out=dim_ff,
             bias=bias,
+            dtype=dtype,
         ) if self.gated else None
 
         if activate_fn == "relu":
@@ -63,6 +66,7 @@ class FeedForward(Cell):
         activate_fn: str = "gated_gelu",
         bias: bool = False,
         dropout_p: float = None,
+        dtype = ms.float32,
     ):
         super().__init__()
         dim_out = dim_out if dim_out != None else dim_in
@@ -72,11 +76,13 @@ class FeedForward(Cell):
             dim_ff=dim_ff,
             activate_fn=activate_fn,
             bias=bias,
+            dtype=dtype,
         )
         self.w_out = Linear(
             dim_in = dim_ff,
             dim_out = dim_out,
             bias = bias,
+            dtype=dtype,
         )
         self.dropout = nn.Dropout(p=dropout_p) if dropout_p != None else None
 
@@ -105,12 +111,14 @@ class FFNBlock(Cell):
         norm_eps: float = 1e-5,
         post_layer_norm: bool = False,
         rms_layer_norm: bool = False,
+        dtype = ms.float32,
     ):
         super().__init__()
         self.layernorm = LayerNorm(
             dim_norm=dim_model,
             eps=norm_eps,
             rms_layer_norm=rms_layer_norm,
+            dtype=dtype,
         )
         self.ffn = FeedForward(
             dim_in=dim_model,
@@ -118,6 +126,7 @@ class FFNBlock(Cell):
             activate_fn=activate_fn,
             bias=bias,
             dropout_p=dropout_p,
+            dtype=dtype,
         )
         self.dropout = nn.Dropout(p=dropout_p) if dropout_p != None else None
         self.post_layer_norm = post_layer_norm

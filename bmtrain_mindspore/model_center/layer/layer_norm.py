@@ -17,19 +17,18 @@ class LayerNorm(DistributedModule):
         eps: float = 1e-5,
         rms_layer_norm: bool = False,
         init = 1,
+        dtype = ms.float32,
     ):
         super().__init__()
         self.dim_norm = dim_norm
         self.eps = eps
         self.rms_layer_norm = rms_layer_norm
-        # operator
-        # self.layer_norm_ops = ops.LayerNorm(begin_norm_axis=-1, begin_params_axis=-1, epsilon=eps)
 
         # initialize the weight
-        init_tensor = initializer(init=init, shape=(dim_norm,))
+        init_tensor = initializer(init=init, shape=(dim_norm,), dtype=dtype)
         self.weight = DistributedParameter(init_tensor)
         self.bias = DistributedParameter(
-            Tensor(np.zeros(shape=(dim_norm,)), dtype=ms.float32)
+            Tensor(np.zeros(shape=(dim_norm,)), dtype=dtype)
         ) if not rms_layer_norm else None
 
     def construct(self, x: Tensor):

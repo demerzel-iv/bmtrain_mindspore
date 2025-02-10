@@ -17,13 +17,14 @@ class Embedding(DistributedModule):
         embedding_size: int,
         padding_idx: int = None,
         init = 'normal',
+        dtype = ms.float32,
     ):
         super().__init__()
         self.vocab_size = vocab_size
         self.dim_model = embedding_size
         self.padding_idx = padding_idx
         # initialize the weight
-        init_tensor = initializer(init=init, shape=(vocab_size, embedding_size))
+        init_tensor = initializer(init=init, shape=(vocab_size, embedding_size), dtype=dtype)
         self.weight = DistributedParameter(init_tensor)
 
     def construct(self, ids: Tensor) -> Tensor:
@@ -33,8 +34,5 @@ class Embedding(DistributedModule):
         Returns:
             A tensor of shape (batch_size, seq_len, embedding_size) with values set to 0 where `ids` are equal to `padding_idx`.
         """
-        #embed = ops.gather(self.weight, index=ids, dim=0)
         embed = F.embedding(ids, self.weight, self.padding_idx)
-        #if self.padding_idx != None:
-        #    embed[ids == self.padding_idx] = 0.
         return embed
