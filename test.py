@@ -6,6 +6,7 @@ import mindspore as ms
 import bmtrain_mindspore as bms
 
 from mindspore import nn
+from mindspore import mint
 from mindnlp.core import ops
 from mindspore import Tensor, Parameter
 from mindspore.train.summary import SummaryRecord
@@ -31,43 +32,6 @@ class Test(DistributedModule):
     def construct(self, x):
         return (self.w * x).sum()
 
-class MM(nn.Cell):
-    def __init__(self, u):
-        super().__init__()
-        self.w = Parameter(u)
-
-def more_test():
-    #ms.set_context(mode=ms.PYNATIVE_MODE, save_graphs=3, save_graphs_path="ir")
-    ag = ms.ops.AllGather()
-    rank = bms.rank()
-
-    #def fwd(x, y):
-    #    return (ag(x) * y).sum()
-    #x = Tensor(np.ones((1,6)).astype(np.float32))
-    #y = Tensor(bms.rank(), dtype=ms.float32)
-    #grad_fn = ms.value_and_grad(fwd, grad_position=(0, 1))
-    #out = grad_fn(x, y)
-
-    def initm():
-        param = Tensor(np.ones((4, 6)), dtype=ms.float32)
-        m = MM(param.reshape(-1)[rank*6: (rank+1)*6])
-        return m
-    m = initm()
-
-    def fwd(y):
-        return (ag(m.w) * y).sum()
-    y = Tensor(rank, dtype=ms.float32)
-    grad_fn = ms.value_and_grad(fwd, grad_position=0, weights=m.trainable_params())
-    out = grad_fn(y)
-
-    #m = Test(4, 6)
-    #def fwd():
-    #    return m.w.sum()
-
-    #grad_fn = ms.value_and_grad(fwd, weights=m.trainable_params(), grad_position=None)
-
-    print('-----rank-{}, [{}]------'.format(bms.rank(), out))
-
 def test():
     bms.init_distributed()
 
@@ -81,15 +45,59 @@ def test():
     print('-----rank-{}, [{}]------'.format(bms.rank(), x))
     print('-----rank-{}, [{}]------'.format(bms.rank(), out))
 
+class MyMatmul(DistributedModule):
+    def __init__(self, a, b):
+        super().__init__()
+        arr = np.random.rand(a, b)
+        self.w = DistributedParameter(Tensor(arr, dtype=ms.float32))
+
+    def construct(self, x):
+        return ops.matmul(x, self.w)
+
+def test_train():
+    bms.init_distributed()
+
+    u, v = 5, 5
+
+    np.random.seed(0)
+    m = MyMatmul(u, v)
+    ans = Tensor(np.random.rand(u, v), dtype=ms.float32)
+
+    np.random.seed(bms.rank())
+
+    optimizer = mint.optim.Adam(m.trainable_params(), lr=1e-3)
+    print('--rank-{}-, [{}]'.format(bms.rank(), optimizer.parameters))
+
+    def forward_fn(x, y):
+        y_pred = m.construct(x)
+        loss = ops.mean((y_pred - y) ** 2)
+        return loss, y_pred
+
+    grad_fn = ms.value_and_grad(forward_fn, None, optimizer.parameters, has_aux=True)
+
+    for i in range(1000):
+        x = Tensor(np.random.rand(1000//bms.world_size(), u), dtype=ms.float32)
+        y = ops.matmul(x, ans)
+
+        (loss, _), grads = grad_fn(x, y)
+        grads = tuple(gd / bms.world_size() for gd in grads)
+        optimizer.construct(grads)
+        bms.print_rank(i, loss)
+
+    bms.print_rank(m.w, '\n', ans)
+    #bms.save(m, '/home/hanxu/lyq/data/test_model/test.ckpt')
+
+def test_load():
+    m = MyMatmul(33, 51)
+    bms.load(m, '/home/hanxu/lyq/data/test_model/test.ckpt')
+    bms.print_rank(m.w)
+
 def test_load_time():
     from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
     from mindnlp.transformers import PreTrainedTokenizerFast, AutoTokenizer
-
     model_path = '/root/PLMs/llama2-7b-ms'
     model = Llama.from_pretrained(model_path)
-
     print('memory occupation after loading - {} - {} -'.format(ms.hal.memory_allocated(), bms.rank()))
-    
 
 def test_llama():
     from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
@@ -119,22 +127,24 @@ def test_generate():
     import bmtrain_mindspore as bms
     from bmtrain_mindspore.model_center.model.llama import Llama
 
-    #model_path = '/root/data/Llama-2-7b-ms'
-    model_path = '/root/lyq/data/Llama-2-7b-ms'
+    model_path = '/home/hanxu/lyq/data/Llama-2-7b-ms'
 
     model = Llama.from_pretrained(model_path)
-    #print('device rank {} - memory occupation - {}'.format(bms.rank(), ms.hal.memory_allocated()))
 
+    print('device rank {} - memory occupation - {}'.format(bms.rank(), ms.runtime.memory_allocated()))
+    
     tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_path)
     s = "The sun sets in the west, painting the sky with"
     x = tokenizer.encode(s, return_tensors='ms') # bs, n
 
-    #print('begin forwarding - {} - {} -'.format(ms.hal.memory_allocated(), bms.rank()))
+    print('begin forwarding - rank {} - memory occupation - {}'.format(bms.rank(), ms.runtime.memory_allocated()))
 
     #_framework_profiler_step_start()
     with Timer('prefill'):
         hidden_states, past_key_values, logits = model.construct(x, use_cache=True, output_logits=True)
     #_framework_profiler_step_end()
+
+    print('after prefilling - rank {} - memory occupation - {}'.format(bms.rank(), ms.runtime.memory_allocated()))
 
     next_tok = logits[0, -1].argmax().reshape(1,1)
     tok_list = (x, next_tok)
@@ -157,23 +167,16 @@ def test_generate():
 
     print(tokenizer.convert_ids_to_tokens(res[0]))
 
-def test_train():
-    pass
-
 def main():
-    #parser = argparse.ArgumentParser()
-    #parser.add_argument('--sync', action='store_true')
-    #sync = parser.parse_args().sync
-    sync = True
-
-    bms.init_distributed()
-
     ms.set_context(mode=ms.PYNATIVE_MODE)
-    ms.set_context(pynative_synchronize=sync)
-    #ms.set_context(pynative_synchronize=False)
+    bms.init_distributed(
+        synchronous_execution=False,
+        device_list=[4, 5, 6, 7],
+    )
     
-    test_generate()
-    #test()
+    #test_generate()
+    test_train()
+    #test_load()
 
 if __name__ == '__main__':
     main()

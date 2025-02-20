@@ -7,7 +7,7 @@ from collections import OrderedDict
 from mindspore import Tensor, Parameter, load_checkpoint, load_param_into_net
 from mindspore import ops as raw_ops
 from mindnlp.core import ops
-from mindnlp.core.serialization import safe_load_file
+from mindnlp.core.serialization import safe_load_file, safe_save_file
 from mindspore.nn import Cell
 from mindspore.train.serialization import _exec_save
 
@@ -15,17 +15,7 @@ from .distributed_parameter import DistributedParameter
 from .utils import serialize_to_numpy, deserialize_from_numpy, Timer
 from .global_var import rank
 
-def convert_model_to_param_dict(model: Cell) -> Dict[str, Tuple[Tuple[int], str, Tensor]]:
-    """
-    Returns:
-        Dict[str, Tuple[Tuple[int], str, Tensor]]: A dictionary where:
-
-            - The keys are the names of the parameters.
-            - The values are tuples containing:
-                - shape (Tuple[int]): The shape of the parameter tensor.
-                - dtype (str): The data type of the parameter tensor.
-                - data (Tensor): The parameter tensor itself.
-    """
+def save(model: Cell, save_path: str):
     param_dict = OrderedDict()
     for name, param in model.parameters_and_names():
         if isinstance(param, DistributedParameter):
@@ -33,23 +23,15 @@ def convert_model_to_param_dict(model: Cell) -> Dict[str, Tuple[Tuple[int], str,
         else:
             assert isinstance(param, Parameter)
             value = param.value()
-        param_dict[name] = (
-            value.shape,
-            str(value.dtype),
-            value
-        )
-    return param_dict
+        param_dict[name] = value
 
-# TODO replace `_exec_save` by `safe_save_file`
-def save(model: Cell, save_path: str):
-    param_dict = convert_model_to_param_dict(model)
-    _exec_save(save_path, param_dict)
+    if rank() == 0:
+        safe_save_file(param_dict, save_path)
 
 def load(model: Cell, load_path: str, strict: bool = False):
     broad_cast = raw_ops.Broadcast(root_rank=0)
     if rank() == 0:
         with Timer('load file'):
-            #param_dict: Dict[str, Parameter] = load_checkpoint(load_path)
             param_dict: Dict[str, Parameter] = safe_load_file(load_path)
 
         meta_data: Dict[str, Tuple] = {}
@@ -69,7 +51,6 @@ def load(model: Cell, load_path: str, strict: bool = False):
                 param_dict[name] = value
 
     else:
-        print('wait for loading - rank {}'.format(rank()))
         # recieve meta data from rank 0
         meta_data_size = Tensor(0, dtype=ms.int32)
         meta_data_size, = broad_cast((meta_data_size,))

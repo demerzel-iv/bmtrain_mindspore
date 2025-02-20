@@ -2,16 +2,23 @@ import os
 import mindspore as ms
 
 from .global_var import config
+from typing import List
 
-def init_distributed():
+def init_distributed(
+        synchronous_execution: bool = False,
+        device_list: List[int] = None,
+):
     if config['initialized']:
         return 
 
+    rank = int(os.environ['RANK_ID'])
+    if device_list != None:
+        ms.set_device('Ascend', device_list[rank])
+    if synchronous_execution:
+        ms.runtime.launch_blocking()
+
     ms.communication.init('hccl')
     world_size = ms.communication.get_group_size()
-    rank = ms.communication.get_rank()
-
-    ms.set_context(device_id=rank)
 
     config['initialized'] = True
     config['rank'] = rank
