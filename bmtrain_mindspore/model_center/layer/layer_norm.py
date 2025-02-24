@@ -16,7 +16,6 @@ class LayerNorm(DistributedModule):
         dim_norm: int,
         eps: float = 1e-5,
         rms_layer_norm: bool = False,
-        init = 1,
         dtype = ms.float32,
     ):
         super().__init__()
@@ -25,8 +24,9 @@ class LayerNorm(DistributedModule):
         self.rms_layer_norm = rms_layer_norm
 
         # initialize the weight
-        init_tensor = initializer(init=init, shape=(dim_norm,), dtype=dtype)
-        self.weight = DistributedParameter(init_tensor)
+        self.weight = DistributedParameter(
+            Tensor(np.ones(shape=(dim_norm,)), dtype=dtype)
+        )
         self.bias = DistributedParameter(
             Tensor(np.zeros(shape=(dim_norm,)), dtype=dtype)
         ) if not rms_layer_norm else None
@@ -45,7 +45,6 @@ class LayerNorm(DistributedModule):
         else:
             # RMS layer norm
             old_dtype = x.dtype
-            #ms.mint.mean()
             variance = x.to(ms.float32).pow(2).mean(axis=-1, keep_dims=True)
             x = x * ops.rsqrt(variance + self.eps)
             return x.to(old_dtype) * self.weight

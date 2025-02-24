@@ -11,9 +11,13 @@ def init_distributed(
     if config['initialized']:
         return 
 
+    ms.set_context(mode=ms.PYNATIVE_MODE)
+
     rank = int(os.environ['RANK_ID'])
     if device_list != None:
         ms.set_device('Ascend', device_list[rank])
+    else:
+        ms.set_device('Ascend', rank)
     if synchronous_execution:
         ms.runtime.launch_blocking()
 

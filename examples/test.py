@@ -168,10 +168,8 @@ def test_generate():
     print(tokenizer.convert_ids_to_tokens(res[0]))
 
 def main():
-    ms.set_context(mode=ms.PYNATIVE_MODE)
     bms.init_distributed(
         synchronous_execution=False,
-        device_list=[4, 5, 6, 7],
     )
     
     #test_generate()

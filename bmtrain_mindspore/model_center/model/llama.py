@@ -68,7 +68,6 @@ class Llama(BaseModel):
 
         if attention_mask == None:
             attention_mask = ops.full(size=(batch_size,), fill_value=total_len, dtype=ms.int32)
-            #attention_mask = ops.fill(shape=(batch_size,), value=total_len, type=ms.int32)
         
         if len(attention_mask.shape) == 3:
             attention_mask_2d = attention_mask
