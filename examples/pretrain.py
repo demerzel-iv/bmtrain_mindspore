@@ -218,21 +218,11 @@ def train():
         ), flush=True)
         lst_time = time()
 
-        import gc; gc.collect()
-        if iter == 10: break
-
-    #bms.save(model, '/root/thunlp/data/test_model/model.safetensors')
+    bms.save(model, '/root/thunlp/data/test_model/model.safetensors')
 
 
 bms.init_distributed()
-dbg = False
-if bms.rank() == 0 and dbg:
-    import debugpy
-    debugpy.listen(("127.0.0.1", 12306))
-    print('waiting', flush=True)
-    debugpy.wait_for_client()
-    print('connected', flush=True)
 
-#train()
-#valid()
+train()
+valid()
 generate()
