@@ -42,17 +42,10 @@
     - 分布式模型存储
     - 分布式模型的保存/加载
     - 前向/反向传播计算正确性验证
+- checkpoint优化
 - ModelCenter
     - 模型组件：Linear, Embedding, LayerNorm, Attention, FeedForward, TransformerBlock
     - LLaMA
         - 完整模型代码
         - huggingface的ckpt到mindspore的ckpt的转换脚本
-        - 正确性验证
-
-## TODOLIST
-
-- optimizer
-    - Adam优化器
-    - 训练管理器
 - 验证模型训练能正确收敛
-- checkpoint优化
