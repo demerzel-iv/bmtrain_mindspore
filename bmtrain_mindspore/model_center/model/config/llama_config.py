@@ -24,4 +24,8 @@ class LlamaConfig(Config):
         self.num_heads = num_heads
         self.activate_fn = activate_fn
         self.eps = eps
-        self.dtype = {'fp16': ms.float16}.get(dtype)
+        self.dtype = {
+            'bf16': ms.bfloat16,
+            'fp16': ms.float16,
+            'fp32': ms.float32,
+        }.get(dtype)

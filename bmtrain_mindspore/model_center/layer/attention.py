@@ -124,7 +124,11 @@ class Attention(Cell):
         #TODO if self.pos_bias_type == "relative":
         #    if position_bias is not None:
         #        score = score + position_bias
-        
+
+        def remove_nan(grad: Tensor):
+            return ops.masked_fill(grad, grad.isnan(), 0)
+        score.register_hook(remove_nan)
+
         score = ops.masked_fill(
             score,
             attention_mask.view(batch_size, 1, len_q, len_k)==False,

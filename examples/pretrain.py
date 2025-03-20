@@ -2,58 +2,49 @@ import numpy as np
 import mindspore as ms
 import bmtrain_mindspore as bms
 
-from mindspore import mint, ops
+from time import time
 from datasets import load_dataset
-from mindspore import Tensor, Parameter
-from mindspore.mint.nn import CrossEntropyLoss
+from mindnlp.core import ops
+from mindspore import mint, Tensor, Parameter
 from mindnlp.transformers import PreTrainedTokenizerFast, AutoTokenizer
 from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
+from bmtrain_mindspore.utils import Timer
 
-from utils import DistributedDataLoader
-
+from data_utils import DistributedDataLoader
 
 from mindspore import nn
 from mindspore.experimental import optim
-class WarmupDecayLRScheduler(optim.lr_scheduler.LRScheduler):
-    def __init__(self, optimizer, last_epoch=-1, warmup_steps=1000, total_iters=100000, lr=1e-5):
-        self.total_iters = total_iters
+
+class WarmupStableDecayLRScheduler(optim.lr_scheduler.LRScheduler):
+    def __init__(
+        self,
+        optimizer,
+        last_epoch=-1,
+        warmup_steps=100,
+        decay_start=4000,
+        total_iters=5000,
+        lr=1e-5
+    ):
         self.warmup_steps = warmup_steps
+        self.decay_start = decay_start
+        self.total_iters = total_iters
         self.lr = lr
-        super(WarmupDecayLRScheduler, self).__init__(optimizer, last_epoch)
+        super(WarmupStableDecayLRScheduler, self).__init__(optimizer, last_epoch)
 
     def get_lr(self):
         if self.last_epoch < self.warmup_steps:
+            # Warmup
             lr_ret = self.lr * (self.last_epoch + 1) / self.warmup_steps
+        elif self.last_epoch < self.decay_start:
+            # Stable
+            lr_ret = self.lr
         else:
-            lr_ret = self.lr * (1 - (self.last_epoch - self.warmup_steps) / (self.total_iters - self.warmup_steps))
+            # Decay
+            decay_iters = self.total_iters - self.decay_start
+            lr_ret = self.lr * max(0, 1 - (self.last_epoch - self.decay_start) / decay_iters)
 
         return [lr_ret] * len(self._last_lr)
 
-        #if self.last_epoch == 0:
-        #    return [lr * self.factor for lr in self._last_lr]
-        #if self.last_epoch != self.total_iters:
-        #    return [lr * 1. for lr in self._last_lr]
-        #return [lr / self.factor for lr in self._last_lr]
-
-
-def count():
-    tokenizer_path = '/home/hanxu/lyq/data/Llama-2-7b-ms'
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(tokenizer_path)
-    tokenizer.pad_token = tokenizer.eos_token
-
-    dataset = list(map(
-        lambda item: item['text'].replace('<|endoftext|> ', '</s>'),
-        load_dataset("fhswf/TinyStoriesV2_cleaned", split='test'),
-    ))
-
-    from tqdm import tqdm
-    cnt = []
-    for line in tqdm(dataset):
-        cnt.append(len(tokenizer.encode(line)))
-    cnt = np.array(cnt)
-    for i in range(4):
-        print(i, np.sum(cnt // 512 == i))
-    print('long', np.sum(cnt // 512 >= 4))
 
 def random_init_model(model: Llama):
     for name, param in model.parameters_and_names():
@@ -69,69 +60,67 @@ def random_init_model(model: Llama):
                 dtype=param.dtype
             ))
 
-def test_init():
-    bms.init_distributed(device_list=[4, 5, 6, 7])
-
-    tokenizer_path = '/home/hanxu/lyq/data/Llama-2-7b-ms'
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(tokenizer_path)
-
-    model = Llama.from_pretrained(tokenizer_path)
-    #config = LlamaConfig.from_json_file('./small_llama.json')
-    #model = Llama(config)
-    #random_init_model(model)
-
-    #for name, param in model.parameters_and_names():
-    #    print(name, np.array(param).std())
-
-    loss_func = CrossEntropyLoss()
-
-    s = "The sun sets in the west, painting the sky with"
-    x = tokenizer.encode(s, return_tensors='ms') # bs, n
-
-    y = x[:, 1:].copy().astype(ms.int32)
-
-    _, _, logits = model.construct(input_ids=x[:, :-1], output_logits=True)
-
-    labels = y.reshape(-1)
-    logits = logits.reshape(-1, logits.shape[-1])
-
-    print(logits)
-    print(y)
-    print(loss_func(logits, labels))
-
-def train():
-    bms.init_distributed(device_list=[4, 5, 6, 7])
-
-    tokenizer_path = '/home/hanxu/lyq/data/Llama-2-7b-ms'
+def generate():
+    tokenizer_path = '/root/thunlp/data/Llama-2-7b-tokenizer'
     tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(tokenizer_path)
     tokenizer.pad_token = tokenizer.eos_token
 
+    config = LlamaConfig.from_json_file('./small_llama.json', dtype='bf16')
+    model = Llama(config)
+    bms.load(model, '/root/thunlp/data/test_model/model.safetensors')
+
+    input_ids = Tensor([[tokenizer.bos_token_id]])
+    key_values = None
+    tok_list = (input_ids,)
+    stream = ''
+
+    temperature = 0.7
+
+    for i in range(1000):
+        _, key_values, logits = model.construct(
+            input_ids=input_ids,
+            output_logits=True,
+            use_cache=True,
+            past_key_values=key_values,
+        )
+        prob = ops.softmax(logits.reshape(-1).astype(ms.float32) / temperature).numpy()
+        next_tok_id = np.random.choice(logits.shape[-1], p=prob)
+
+        input_ids = Tensor([[next_tok_id]])
+        tok_list += (input_ids,)
+
+        res = ops.cat(tok_list, dim=-1)
+        new_stream = tokenizer.decode(res[0])
+        print(new_stream[len(stream):], end='', flush=True)
+        stream = new_stream
+
+        if input_ids.item() == tokenizer.eos_token_id:
+            break
+
+    print('')
+    print(tokenizer.convert_ids_to_tokens(res[0]))
+
+
+def valid():
+    tokenizer_path = '/root/thunlp/data/Llama-2-7b-tokenizer'
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(tokenizer_path)
+    tokenizer.pad_token = tokenizer.eos_token
     dataset = list(map(
         lambda item: item['text'].replace('<|endoftext|>', '</s>'),
         load_dataset("fhswf/TinyStoriesV2_cleaned", split='test')
     ))
-
-    loss_func = CrossEntropyLoss()
-
-    train_loader = DistributedDataLoader(
+    valid_loader = DistributedDataLoader(
         dataset=dataset,
         tokenizer=tokenizer,
-        batch_size=4,
-        max_length=513,
+        batch_size=60,
+        max_length=512 + 1,
     )
 
-    #config = LlamaConfig.from_json_file('./small_llama.json')
-    #model = Llama(config)
-    #random_init_model(model)
-    model = Llama.from_pretrained(tokenizer_path)
+    config = LlamaConfig.from_json_file('./small_llama.json', dtype='bf16')
+    model = Llama(config)
+    bms.load(model, '/root/thunlp/data/test_model/model.safetensors')
 
-    lr = 1e-5
-    optimizer = mint.optim.Adam(model.trainable_params(), lr=0.0)
-    scheduler = WarmupDecayLRScheduler(
-        optimizer=optimizer,
-        warmup_steps=300,
-        lr = lr,
-    )
+    loss_func = mint.nn.CrossEntropyLoss()
 
     def forward_fn(input_ids, attention_mask, labels):
         _, _, logits = model.construct(
@@ -141,46 +130,109 @@ def train():
         )
         labels = labels.reshape(-1)
         logits = logits.reshape(-1, logits.shape[-1])
-        print(logits)
-        print(labels)
+        loss = loss_func.construct(logits, labels)
+        return loss
+
+    for iter, input_data in enumerate(valid_loader):
+        # prepare input
+        input_ids = input_data['input_ids'][:, :-1]
+        attention_mask = input_data['attention_mask'][:, :-1]
+        labels = input_data['input_ids'][:, 1:].copy().astype(ms.int32)
+        labels[input_data['attention_mask'][:, 1:] == 0] = -100
+
+        # optim step
+        loss = forward_fn(input_ids, attention_mask, labels)
+
+        print('valid iter {}/{} | valid | loss: {:.3f} | mem: {:.1f}GB'.format(
+            iter, len(valid_loader), float(loss),
+            ms.runtime.max_memory_allocated() / (2**30),
+        ), flush=True)
+
+
+def train():
+    tokenizer_path = '/root/thunlp/data/Llama-2-7b-tokenizer'
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(tokenizer_path)
+    tokenizer.pad_token = tokenizer.eos_token
+
+    dataset = list(map(
+        lambda item: item['text'].replace('<|endoftext|>', '</s>'),
+        load_dataset("fhswf/TinyStoriesV2_cleaned", split='train')
+    ))
+    train_loader = DistributedDataLoader(
+        dataset=dataset,
+        tokenizer=tokenizer,
+        batch_size=80,
+        max_length=512 + 1,
+    )
+    print('length of dataset: {}'.format(len(train_loader)))
+
+    config = LlamaConfig.from_json_file('./small_llama.json', dtype='bf16')
+    model = Llama(config)
+    random_init_model(model)
+
+    lr = 1e-3
+    optimizer = mint.optim.Adam(model.trainable_params(), eps=1e-5)
+    scheduler = WarmupStableDecayLRScheduler(
+        optimizer=optimizer,
+        warmup_steps=100,
+        decay_start=len(train_loader) * 0.8,
+        total_iters=len(train_loader),
+        lr=lr,
+    )
+    loss_func = mint.nn.CrossEntropyLoss()
+
+    def forward_fn(input_ids, attention_mask, labels):
+        _, _, logits = model.construct(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            output_logits=True,
+        )
+        labels = labels.reshape(-1)
+        logits = logits.reshape(-1, logits.shape[-1])
         loss = loss_func.construct(logits, labels)
         return loss
 
     grad_fn = ms.value_and_grad(forward_fn, None, optimizer.parameters)
+    lst_time = time()
 
     for iter, input_data in enumerate(train_loader):
+        # prepare input
         input_ids = input_data['input_ids'][:, :-1]
         attention_mask = input_data['attention_mask'][:, :-1]
-
         labels = input_data['input_ids'][:, 1:].copy().astype(ms.int32)
         labels[input_data['attention_mask'][:, 1:] == 0] = -100
 
-        loss, grads = grad_fn(input_ids, attention_mask, labels)
-        grads = tuple(gd / bms.world_size() for gd in grads)
-        print(grads)
-        optimizer.construct(grads)
-        scheduler.step()
+        # optim step
+        with Timer(print_to_screen=False) as train_timer:
+            loss, grads = grad_fn(input_ids, attention_mask, labels)
+            grads = tuple(gd / bms.world_size() for gd in grads)
+            optimizer.construct(grads)
+            scheduler.step()
 
-        print(iter, loss)
-        print('memory occupation - {}'.format(ms.runtime.memory_allocated()))
-        for name, param in model.parameters_and_names():
-            print(name, np.array(param).std())
-        print('=======\n\n\n')
+        print('iter {} | lr: {:.1e} | loss: {:.3f} | mem: {:.1f}GB/{:.1f}GB | time: {:.2f}s+{:.2f}s'.format(
+            iter, float(scheduler.get_lr()[0]), float(loss),
+            ms.runtime.max_memory_allocated() / (2**30),
+            ms.runtime.memory_allocated() / (2**30),
+            train_timer.elapsed_time,
+            time() - lst_time - train_timer.elapsed_time,
+        ), flush=True)
+        lst_time = time()
 
-        #_, _, logits = model.construct(
-        #    input_ids=input_ids,
-        #    attention_mask=attention_mask,
-        #    output_logits=True,
-        #)
+        import gc; gc.collect()
+        if iter == 10: break
 
-        #labels = labels.reshape(-1)
-        #logits = logits.reshape(-1, logits.shape[-1])
-        #loss = loss_func.construct(logits, labels)
+    #bms.save(model, '/root/thunlp/data/test_model/model.safetensors')
 
-        #print(loss)
 
-        if iter == 2:
-            break
+bms.init_distributed()
+dbg = False
+if bms.rank() == 0 and dbg:
+    import debugpy
+    debugpy.listen(("127.0.0.1", 12306))
+    print('waiting', flush=True)
+    debugpy.wait_for_client()
+    print('connected', flush=True)
 
-train()
-#test_init()
+#train()
+#valid()
+generate()

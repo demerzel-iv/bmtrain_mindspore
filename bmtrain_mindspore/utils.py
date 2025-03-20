@@ -8,19 +8,27 @@ from mindspore import Tensor
 from .global_var import config
 
 class Timer:
-    def __init__(self, name=None, rank=0):
-        self.name = name if name!=None else '-'
+    def __init__(
+            self,
+            name: str = '-',
+            rank: int = 0,
+            print_to_screen: bool = True,
+        ):
+        self.name = name
         self.rank = rank
+        self.print_to_screen = print_to_screen
+
     def __enter__(self):
-        if config['rank'] == self.rank:
-            print(f"[{self.name}]-{self.rank} Begin")
+        if config['rank'] == self.rank and self.print_to_screen:
+            print(f"[{self.name}]-{self.rank} Begin", flush=True)
         self.start_time = time()
         return self
+
     def __exit__(self, exc_type, exc_value, traceback):
         self.end_time = time()
         self.elapsed_time = self.end_time - self.start_time
-        if config['rank'] == self.rank:
-            print(f"[{self.name}]-{self.rank} Elapsed time: {self.elapsed_time:.6f} seconds")
+        if config['rank'] == self.rank and self.print_to_screen:
+            print(f"[{self.name}]-{self.rank} Elapsed time: {self.elapsed_time:.6f} seconds", flush=True)
 
 def print_rank(*args, rank=0, **kwargs):
     if config['rank'] == rank:

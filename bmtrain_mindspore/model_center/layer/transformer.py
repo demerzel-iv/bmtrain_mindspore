@@ -143,7 +143,15 @@ class Encoder(Cell):
         current_key_values = ()
         for i, module in enumerate(self.layers):
             module: TransformerBlock 
-            hidden_states, current_key_value = module.construct(
+            #hidden_states, current_key_value = module.construct(
+            #    hidden_states=hidden_states,
+            #    attention_mask=attention_mask,
+            #    position_bias=position_bias,
+            #    use_cache=use_cache,
+            #    past_key_value=past_key_values[i] if past_key_values != None else None,
+            #)
+            hidden_states, current_key_value = ms.recompute(
+                module,
                 hidden_states=hidden_states,
                 attention_mask=attention_mask,
                 position_bias=position_bias,
