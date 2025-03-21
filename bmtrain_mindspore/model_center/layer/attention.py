@@ -90,17 +90,6 @@ class Attention(Cell):
         h_k: Tensor = h_k.view(batch_size, len_k, self.num_heads_kv, self.dim_head).permute(0, 2, 1, 3) # (batch, num_heads_kv, len_k, dim_head)
         h_v: Tensor = h_v.view(batch_size, len_k, self.num_heads_kv, self.dim_head).permute(0, 2, 1, 3) # (batch, num_heads_kv, len_k, dim_head)
 
-        # either num_heads_kv == num_heads or num_heads_kv == 1, otherwise replicate h_k and h_v to make num_heads_kv == num_heads 
-        if self.num_head_groups != 1 and self.num_heads_kv != 1:
-            h_k = h_k[:, :, None, :, :].broadcast_to(
-                batch_size, self.num_heads_kv, self.num_head_groups, len_k, self.dim_head).reshape(
-                batch_size, self.num_heads, len_k, self.dim_head
-            ) # (batch, num_heads, len_k, dim_head)
-            h_v = h_v[:, :, None, :, :].broadcast_to(
-                batch_size, self.num_heads_kv, self.num_head_groups, len_k, self.dim_head).reshape(
-                batch_size, self.num_heads, len_k, self.dim_head
-            ) # (batch, num_heads, len_k, dim_head)
-
         h_q = h_q.contiguous()
         h_k = h_k.contiguous()
         h_v = h_v.contiguous()
@@ -112,6 +101,17 @@ class Attention(Cell):
             len_k = h_k.shape[-2]
         # for future calculation
         current_key_value = (h_k, h_v) if use_cache else None
+
+        # either num_heads_kv == num_heads or num_heads_kv == 1, otherwise replicate h_k and h_v to make num_heads_kv == num_heads 
+        if self.num_head_groups != 1 and self.num_heads_kv != 1:
+            h_k = h_k[:, :, None, :, :].broadcast_to(
+                batch_size, self.num_heads_kv, self.num_head_groups, len_k, self.dim_head).reshape(
+                batch_size, self.num_heads, len_k, self.dim_head
+            ) # (batch, num_heads, len_k, dim_head)
+            h_v = h_v[:, :, None, :, :].broadcast_to(
+                batch_size, self.num_heads_kv, self.num_head_groups, len_k, self.dim_head).reshape(
+                batch_size, self.num_heads, len_k, self.dim_head
+            ) # (batch, num_heads, len_k, dim_head)
 
         if self.pos_bias_type == "rotary":
             h_q, h_k = position_bias(h_q, h_k)
