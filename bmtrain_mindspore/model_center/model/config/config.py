@@ -1,9 +1,16 @@
 import os
 import json
+import mindspore as ms
 
 from typing import Type, TypeVar
 
 ConfigType = TypeVar('ConfigType', bound='Config')
+
+DTYPE_MAPPING = {
+    'bf16': ms.bfloat16,
+    'fp16': ms.float16,
+    'fp32': ms.float32,
+}
 
 class Config:
     """

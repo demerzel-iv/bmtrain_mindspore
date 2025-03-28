@@ -30,7 +30,7 @@ def convert_model(source_path: str, target_path: str):
         'dim_head' : old_config['hidden_size'] // old_config['num_attention_heads'],
         'dim_ff' : old_config['intermediate_size'],
         'num_heads' : old_config['num_attention_heads'],
-        'eps' : old_config['rms_norm_eps'],
+        'norm_eps' : old_config['rms_norm_eps'],
     }
 
     os.makedirs(target_path, exist_ok=True)

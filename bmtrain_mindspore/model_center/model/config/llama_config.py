@@ -1,6 +1,6 @@
 import mindspore as ms
 
-from .config import Config
+from .config import Config, DTYPE_MAPPING
 
 class LlamaConfig(Config):
     def __init__(
@@ -12,7 +12,7 @@ class LlamaConfig(Config):
         dim_ff: int,
         num_heads: int,
         activate_fn: str = 'gated_silu',
-        eps: float = 1e-6,
+        norm_eps: float = 1e-6,
         dtype: str = 'fp16'
     ):
         super().__init__()
@@ -23,9 +23,5 @@ class LlamaConfig(Config):
         self.dim_ff = dim_ff
         self.num_heads = num_heads
         self.activate_fn = activate_fn
-        self.eps = eps
-        self.dtype = {
-            'bf16': ms.bfloat16,
-            'fp16': ms.float16,
-            'fp32': ms.float32,
-        }.get(dtype)
+        self.norm_eps = norm_eps
+        self.dtype = DTYPE_MAPPING[dtype]

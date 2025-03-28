@@ -34,7 +34,7 @@ class Llama(BaseModel):
             pos_bias_type='rotary',
             attn_scale=True,
             activate_fn=config.activate_fn,
-            eps=config.eps,
+            norm_eps=config.norm_eps,
             dropout_p=None,
             post_layer_norm=False,
             rms_layer_norm=True,
