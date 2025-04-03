@@ -5,8 +5,7 @@ import mindspore as ms
 from typing import Dict, Tuple
 from collections import OrderedDict
 from mindspore import Tensor, Parameter, load_checkpoint, load_param_into_net
-from mindspore import ops as raw_ops
-from mindnlp.core import ops
+from mindspore import ops
 from mindnlp.core.serialization import safe_load_file, safe_save_file
 from mindspore.nn import Cell
 from mindspore.train.serialization import _exec_save
@@ -29,7 +28,7 @@ def save(model: Cell, save_path: str):
         safe_save_file(param_dict, save_path)
 
 def load(model: Cell, load_path: str, strict: bool = False):
-    broad_cast = raw_ops.Broadcast(root_rank=0)
+    broad_cast = ops.Broadcast(root_rank=0)
     if rank() == 0:
         with Timer('load file'):
             param_dict: Dict[str, Parameter] = safe_load_file(load_path)

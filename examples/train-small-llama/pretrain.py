@@ -1,10 +1,11 @@
+import os
 import numpy as np
 import mindspore as ms
 import bmtrain_mindspore as bms
 
 from time import time
 from datasets import load_dataset
-from mindnlp.core import ops
+from mindspore import ops
 from mindspore import mint, Tensor, Parameter
 from mindnlp.transformers import PreTrainedTokenizerFast, AutoTokenizer
 from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
@@ -14,6 +15,10 @@ from data_utils import DistributedDataLoader
 
 from mindspore import nn
 from mindspore.experimental import optim
+
+TOKENIZER_PATH = '/root/thunlp/data/Llama-2-7b-tokenizer'
+MODELFILE_SAVE_PATH = '/root/thunlp/data/test_model/model.safetensors'
+CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 
 class WarmupStableDecayLRScheduler(optim.lr_scheduler.LRScheduler):
     def __init__(
@@ -61,13 +66,12 @@ def random_init_model(model: Llama):
             ))
 
 def generate():
-    tokenizer_path = '/root/thunlp/data/Llama-2-7b-tokenizer'
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(tokenizer_path)
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
     tokenizer.pad_token = tokenizer.eos_token
 
-    config = LlamaConfig.from_json_file('./small_llama.json', dtype='bf16')
+    config = LlamaConfig.from_json_file(os.path.join(CURRENT_PATH, 'small_llama.json'), dtype='bf16')
     model = Llama(config)
-    bms.load(model, '/root/thunlp/data/test_model/model.safetensors')
+    bms.load(model, MODELFILE_SAVE_PATH)
 
     input_ids = Tensor([[tokenizer.bos_token_id]])
     key_values = None
@@ -89,7 +93,7 @@ def generate():
         input_ids = Tensor([[next_tok_id]])
         tok_list += (input_ids,)
 
-        res = ops.cat(tok_list, dim=-1)
+        res = ops.cat(tok_list, axis=-1)
         new_stream = tokenizer.decode(res[0])
         print(new_stream[len(stream):], end='', flush=True)
         stream = new_stream
@@ -102,8 +106,7 @@ def generate():
 
 
 def valid():
-    tokenizer_path = '/root/thunlp/data/Llama-2-7b-tokenizer'
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(tokenizer_path)
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
     tokenizer.pad_token = tokenizer.eos_token
     dataset = list(map(
         lambda item: item['text'].replace('<|endoftext|>', '</s>'),
@@ -116,9 +119,9 @@ def valid():
         max_length=512 + 1,
     )
 
-    config = LlamaConfig.from_json_file('./small_llama.json', dtype='bf16')
+    config = LlamaConfig.from_json_file(os.path.join(CURRENT_PATH, 'small_llama.json'), dtype='bf16')
     model = Llama(config)
-    bms.load(model, '/root/thunlp/data/test_model/model.safetensors')
+    bms.load(model, MODELFILE_SAVE_PATH)
 
     loss_func = mint.nn.CrossEntropyLoss()
 
@@ -150,8 +153,7 @@ def valid():
 
 
 def train():
-    tokenizer_path = '/root/thunlp/data/Llama-2-7b-tokenizer'
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(tokenizer_path)
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
     tokenizer.pad_token = tokenizer.eos_token
 
     dataset = list(map(
@@ -166,7 +168,7 @@ def train():
     )
     print('length of dataset: {}'.format(len(train_loader)))
 
-    config = LlamaConfig.from_json_file('./small_llama.json', dtype='bf16')
+    config = LlamaConfig.from_json_file(os.path.join(CURRENT_PATH, 'small_llama.json'), dtype='bf16')
     model = Llama(config)
     random_init_model(model)
 
@@ -218,11 +220,13 @@ def train():
         ), flush=True)
         lst_time = time()
 
-    bms.save(model, '/root/thunlp/data/test_model/model.safetensors')
+    bms.save(model, MODELFILE_SAVE_PATH)
 
 
 bms.init_distributed()
 
-train()
-valid()
+#train()
+#valid()
+
+# Avoid using multiple GPUs for generation
 generate()

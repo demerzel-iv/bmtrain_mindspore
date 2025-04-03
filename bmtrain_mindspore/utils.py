@@ -2,8 +2,7 @@ import pickle
 import numpy as np
 
 from time import time
-from mindspore import ops as raw_ops
-from mindnlp.core import ops
+from mindspore import ops
 from mindspore import Tensor
 from .global_var import config
 
@@ -36,7 +35,7 @@ def print_rank(*args, rank=0, **kwargs):
 
 def synchronize():
     barrier = Tensor(1.)
-    all_gather = raw_ops.AllReduce()
+    all_gather = ops.AllReduce()
     x = all_gather(barrier).item()
 
 def serialize_to_numpy(obj) -> np.ndarray:

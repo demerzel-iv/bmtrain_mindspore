@@ -2,7 +2,7 @@ import numpy as np
 import mindspore as ms
 
 from mindspore import Tensor, nn
-from mindnlp.core import ops
+from mindspore import ops
 from mindspore.nn import Cell
 from mindnlp.core.nn import functional as F
 

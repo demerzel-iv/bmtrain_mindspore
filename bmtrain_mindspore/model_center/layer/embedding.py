@@ -4,7 +4,7 @@ import mindspore.nn as nn
 from typing import Union
 from mindspore.common.initializer import initializer
 from mindspore import Tensor
-from mindnlp.core import ops
+from mindspore import ops
 from mindnlp.core.nn import functional as F
 
 from ...distributed_module import DistributedModule

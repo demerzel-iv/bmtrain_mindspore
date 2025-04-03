@@ -3,7 +3,7 @@ import mindspore as ms
 
 from typing import Tuple
 from mindspore import Tensor, nn
-from mindnlp.core import ops
+from mindspore import ops
 from mindspore.nn import Cell
 
 from .attention import AttentionBlock
