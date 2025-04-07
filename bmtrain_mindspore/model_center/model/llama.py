@@ -49,7 +49,7 @@ class Llama(BaseModel):
         self,
         input_ids: Tensor = None,
         attention_mask: Tensor = None,
-        inputs_embeds: Tensor = None,
+        input_embeds: Tensor = None,
         use_cache: bool = False,
         past_key_values: Tuple[Tuple[Tensor]] = None,
         output_logits: bool = False,
@@ -57,15 +57,15 @@ class Llama(BaseModel):
         attention_mask_2d = _prepare_attention_mask(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            inputs_embeds=inputs_embeds,
+            inputs_embeds=input_embeds,
             past_key_values=past_key_values
         )
 
-        if inputs_embeds is None:
-            inputs_embeds = self.input_embedding.construct(input_ids)
+        if input_embeds is None:
+            input_embeds = self.input_embedding.construct(input_ids)
 
         hidden_states, current_key_values = self.encoder.construct(
-            hidden_states=inputs_embeds,
+            hidden_states=input_embeds,
             attention_mask=attention_mask_2d,
             position_bias=self.position_bias,
             use_cache=use_cache,
