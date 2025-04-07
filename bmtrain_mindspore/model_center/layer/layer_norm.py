@@ -1,11 +1,8 @@
 import numpy as np
 import mindspore as ms
 
-from typing import Union
-from mindspore.common.initializer import initializer
-from mindspore import Tensor, nn
+from mindspore import Tensor
 from mindspore import ops
-from mindnlp.core.nn import functional as F
 
 from ...distributed_module import DistributedModule
 from ...distributed_parameter import DistributedParameter
@@ -39,8 +36,7 @@ class LayerNorm(DistributedModule):
             A tensor of shape (..., dim_norm).
         """
         if not self.rms_layer_norm:
-            #x, _, _ = self.layer_norm_ops(x, self.weight, self.bias)
-            x = F.layer_norm(x, x.shape[-1:], self.weight, self.bias, self.eps)
+            x = ops.layer_norm(x, x.shape[-1:], self.weight, self.bias, self.eps)
             return x
         else:
             # RMS layer norm
