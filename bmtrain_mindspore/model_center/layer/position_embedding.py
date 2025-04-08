@@ -16,12 +16,12 @@ class RotaryEmbedding(Cell):
     def __init__(
         self, 
         dim: int, 
-        base: float = 10000,
-        distance_scale: float = 1,
+        base: float = 10000.0,
+        scale_factor: float = 1,
         dtype = ms.float32,
     ):
         super().__init__()
-        self.distance_scale = distance_scale
+        self.scale_factor = scale_factor
 
         # Generate and save the inverse frequency buffer (non trainable)
         self.inv_freq: Tensor = base ** (- ops.arange(0, dim, 2, dtype=dtype) / dim) # (dim/2, )
@@ -49,7 +49,7 @@ class RotaryEmbedding(Cell):
         n=new_seq_len
 
         self.seq_len_cached = n
-        t: Tensor = ops.arange(n).type_as(self.inv_freq) * self.distance_scale
+        t: Tensor = ops.arange(n).type_as(self.inv_freq) / self.scale_factor
         freqs = t.view(n, 1) @ self.inv_freq.view(1, -1) # (n, dim/2)
         emb = ops.cat((freqs, freqs), axis=-1) # (n, dim)
         
