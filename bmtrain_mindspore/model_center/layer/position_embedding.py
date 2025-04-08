@@ -6,7 +6,7 @@ from mindspore import ops
 from mindspore.nn import Cell
 
 
-class RotaryEmbeddingESM(Cell):
+class RotaryEmbedding(Cell):
     """
     Rotary position embeddings based on those in
     [RoFormer](https://huggingface.co/docs/transformers/model_doc/roformer). Query and keys are transformed by rotation

@@ -5,7 +5,7 @@ from mindspore import Tensor
 
 from .base_model import BaseModel, _prepare_attention_mask
 from .config import LlamaConfig
-from ..layer import Embedding, RotaryEmbeddingESM, Encoder, Linear
+from ..layer import Embedding, RotaryEmbedding, Encoder, Linear
 
 class Llama(BaseModel):
     _CONFIG_TYPE = LlamaConfig
@@ -19,7 +19,7 @@ class Llama(BaseModel):
             embedding_size=config.dim_model,
             dtype=config.dtype,
         )
-        self.position_bias = RotaryEmbeddingESM(
+        self.position_bias = RotaryEmbedding(
             dim=config.dim_head,
             dtype=config.dtype,
         )
