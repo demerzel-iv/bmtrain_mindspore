@@ -1,7 +1,6 @@
-import numpy as np
 import mindspore as ms
 
-from mindspore import Tensor, nn
+from mindspore import Tensor
 from mindspore import ops
 from mindspore.nn import Cell
 
@@ -21,7 +20,10 @@ class RotaryEmbedding(Cell):
         dtype = ms.float32,
     ):
         super().__init__()
+        self.dim = dim
+        self.base = base
         self.scale_factor = scale_factor
+        self.dtype = dtype
 
         # Generate and save the inverse frequency buffer (non trainable)
         self.inv_freq: Tensor = base ** (- ops.arange(0, dim, 2, dtype=dtype) / dim) # (dim/2, )
@@ -56,7 +58,12 @@ class RotaryEmbedding(Cell):
         self.cos_cached = emb.cos()
         self.sin_cached = emb.sin()
 
-    def construct(self, q: Tensor, k: Tensor):
+    def construct(
+        self,
+        q: Tensor,
+        k: Tensor,
+        len_k: int = None,
+    ):
         """
         Args:
             q: A tensor of shape (batch, num_heads, len_q, dim_head).
@@ -64,7 +71,8 @@ class RotaryEmbedding(Cell):
         Returns:
             rotated q and k.
         """
-        len_k = k.shape[-2]
+        if len_k == None:
+            len_k = k.shape[-2]
         self.update_cos_sin_tables(len_k)
         q = self.apply_rotary_pos_emb(q, len_k)
         k = self.apply_rotary_pos_emb(k, len_k)
