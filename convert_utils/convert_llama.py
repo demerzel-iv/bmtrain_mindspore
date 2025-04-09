@@ -43,35 +43,23 @@ def convert_model(source_path: str, target_path: str):
         if file.endswith('.bin'):
             old_ckpt |= load_state_dict(os.path.join(source_path, file))
 
-    #new_ckpt = OrderedDict()
     new_ckpt = {}
 
     new_ckpt['input_embedding.weight'] = old_ckpt['model.embed_tokens.weight']
     new_ckpt['encoder.output_layer_norm.weight'] = old_ckpt['model.norm.weight']
-    new_ckpt['output_projection.weight'] = old_ckpt['lm_head.weight'].transpose()
+    new_ckpt['output_projection.weight'] = old_ckpt['lm_head.weight']
     for i in range(old_config['num_hidden_layers']):
         new_ckpt[f'encoder.layers.{i}.ffn.layernorm.weight']                    = old_ckpt[f'model.layers.{i}.post_attention_layernorm.weight']
-        new_ckpt[f'encoder.layers.{i}.ffn.ffn.w_in.w0.weight']                  = old_ckpt[f'model.layers.{i}.mlp.gate_proj.weight'].transpose()
-        new_ckpt[f'encoder.layers.{i}.ffn.ffn.w_in.w1.weight']                  = old_ckpt[f'model.layers.{i}.mlp.up_proj.weight'].transpose()
-        new_ckpt[f'encoder.layers.{i}.ffn.ffn.w_out.weight']                    = old_ckpt[f'model.layers.{i}.mlp.down_proj.weight'].transpose()
+        new_ckpt[f'encoder.layers.{i}.ffn.ffn.w_in.w0.weight']                  = old_ckpt[f'model.layers.{i}.mlp.gate_proj.weight']
+        new_ckpt[f'encoder.layers.{i}.ffn.ffn.w_in.w1.weight']                  = old_ckpt[f'model.layers.{i}.mlp.up_proj.weight']
+        new_ckpt[f'encoder.layers.{i}.ffn.ffn.w_out.weight']                    = old_ckpt[f'model.layers.{i}.mlp.down_proj.weight']
         new_ckpt[f'encoder.layers.{i}.self_att.layernorm.weight']               = old_ckpt[f'model.layers.{i}.input_layernorm.weight']
-        new_ckpt[f'encoder.layers.{i}.self_att.attention.project_k.weight']     = old_ckpt[f'model.layers.{i}.self_attn.k_proj.weight'].transpose()
-        new_ckpt[f'encoder.layers.{i}.self_att.attention.project_q.weight']     = old_ckpt[f'model.layers.{i}.self_attn.q_proj.weight'].transpose()
-        new_ckpt[f'encoder.layers.{i}.self_att.attention.project_v.weight']     = old_ckpt[f'model.layers.{i}.self_attn.v_proj.weight'].transpose()
-        new_ckpt[f'encoder.layers.{i}.self_att.attention.attention_out.weight'] = old_ckpt[f'model.layers.{i}.self_attn.o_proj.weight'].transpose()
+        new_ckpt[f'encoder.layers.{i}.self_att.attention.project_k.weight']     = old_ckpt[f'model.layers.{i}.self_attn.k_proj.weight']
+        new_ckpt[f'encoder.layers.{i}.self_att.attention.project_q.weight']     = old_ckpt[f'model.layers.{i}.self_attn.q_proj.weight']
+        new_ckpt[f'encoder.layers.{i}.self_att.attention.project_v.weight']     = old_ckpt[f'model.layers.{i}.self_attn.v_proj.weight']
+        new_ckpt[f'encoder.layers.{i}.self_att.attention.attention_out.weight'] = old_ckpt[f'model.layers.{i}.self_attn.o_proj.weight']
 
     os.makedirs(target_path, exist_ok=True)
-    # adapt the format for saving
-    #new_ckpt_for_save = OrderedDict()
-    #for k, v in new_ckpt.items():
-    #    value = v.value()
-    #    new_ckpt_for_save[k] = (
-    #        value.shape,
-    #        str(value.dtype),
-    #        value
-    #    )
-    #_exec_save(os.path.join(target_path, 'mindspore_model.ckpt'), new_ckpt_for_save)
-
     safe_save_file(new_ckpt, os.path.join(target_path, 'mindspore_model.safetensors'))
 
 if __name__ == "__main__":

@@ -1,10 +1,9 @@
 import numpy as np
 import mindspore as ms
 
-from typing import Union
+from mindspore import Tensor, ops
+from mindspore.mint.nn import functional as F
 from mindspore.common.initializer import initializer
-from mindspore import Tensor, nn
-from mindspore import ops
 
 from ...distributed_module import DistributedModule
 from ...distributed_parameter import DistributedParameter
@@ -22,7 +21,7 @@ class Linear(DistributedModule):
         self.dim_in = dim_in
         self.dim_out = dim_out
         # initialize the weight
-        init_tensor = initializer(init=init, shape=(dim_in, dim_out), dtype=dtype)
+        init_tensor = initializer(init=init, shape=(dim_out, dim_in), dtype=dtype)
         self.weight = DistributedParameter(init_tensor)
         self.bias = DistributedParameter(
             Tensor(np.zeros(shape=(dim_out,)), dtype=dtype)
@@ -35,7 +34,4 @@ class Linear(DistributedModule):
         Returns:
             A tensor of shape (..., dim_out).
         """
-        x = ops.matmul(x, self.weight)
-        if self.bias != None:
-            x = x + self.bias
-        return x
+        return F.linear(x, self.weight, self.bias)
