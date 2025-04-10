@@ -15,6 +15,11 @@ from .utils import serialize_to_numpy, deserialize_from_numpy, Timer
 from .global_var import rank
 
 def save(model: Cell, save_path: str):
+    """
+    Args:
+        model (Cell): The model to save.
+        save_path (str): The path to the checkpoint file.
+    """
     param_dict = OrderedDict()
     for name, param in model.parameters_and_names():
         if isinstance(param, DistributedParameter):
@@ -28,6 +33,12 @@ def save(model: Cell, save_path: str):
         safe_save_file(param_dict, save_path)
 
 def load(model: Cell, load_path: str, strict: bool = False):
+    """
+    Args:
+        model (Cell): The model to load parameters into.
+        load_path (str): The path to the checkpoint file.
+        strict (bool): Warning, This argument might not be effective.
+    """
     broad_cast = ops.Broadcast(root_rank=0)
     if rank() == 0:
         with Timer('load file'):
