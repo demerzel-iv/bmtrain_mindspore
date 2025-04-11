@@ -1,18 +1,19 @@
 """
-Copied from https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite with few changes
+Copied from https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite with modifications
 """
 
 import math
 import numpy as np
 import mindspore as ms
 
-from typing import List, Tuple
-from mindspore import Tensor, nn
-from mindspore import ops
+from typing import Tuple, Any
+from mindspore import Tensor, nn, ops
+from mindspore.mint.nn import functional as F
+from bmtrain_mindspore import DistributedParameter, DistributedModule
 
 from .base_model import BaseModel, _prepare_attention_mask
 from .config import DeepseekV2Config
-from ..layer import Embedding, RotaryEmbedding, Encoder, Linear, LayerNorm
+from ..layer import Embedding, RotaryEmbedding, Linear, LayerNorm, FeedForward
 
 class YarnRotaryEmbedding(RotaryEmbedding):
     # Inverse dim formula to find dim based on number of rotations
@@ -48,7 +49,7 @@ class YarnRotaryEmbedding(RotaryEmbedding):
 
         linear_func = (np.arange(dim, dtype=np.float32) - min_val) / (max_val - min_val)
         ramp_func = np.clip(linear_func, 0, 1)
-        return Tensor(ramp_func)
+        return Tensor(ramp_func, dtype=ms.float32)
 
     def __init__(
         self,
@@ -119,8 +120,6 @@ class YarnRotaryEmbedding(RotaryEmbedding):
         
 
 class DeepseekV2Attention(nn.Cell):
-    """Multi-headed attention from 'Attention Is All You Need' paper"""
-
     def __init__(self, config: DeepseekV2Config, layer_idx: int):
         super().__init__()
         self.config = config
@@ -269,7 +268,9 @@ class DeepseekV2Attention(nn.Cell):
                 Tensor(-1e9, dtype=self.config.dtype)
             )
 
-        attn_weights = ops.softmax(attn_weights, axis=-1)  # (bsz, num_heads, q_len, kv_seq_len)
+        attn_weights = ops.softmax(
+            attn_weights.to(ms.float32), axis=-1
+        ).to(self.config.dtype)  # (bsz, num_heads, q_len, kv_seq_len)
 
         attn_output = ops.matmul(attn_weights, value_states)  # (bsz, num_heads, q_len, v_head_dim)
         attn_output = ops.transpose(attn_output, (0, 2, 1, 3))  # (bsz, q_len, num_heads, v_head_dim)
@@ -278,6 +279,120 @@ class DeepseekV2Attention(nn.Cell):
         attn_output = self.o_proj(attn_output)  # (bsz, q_len, dim_model)
 
         return attn_output, current_key_value
+
+
+class MoEGate(DistributedModule):
+    def __init__(self, config: DeepseekV2Config):
+        super().__init__()
+        self.config = config
+        self.weight = DistributedParameter(
+            Tensor(
+                np.empty((config.n_routed_experts, config.dim_model)),
+                config.dtype
+            ), 
+        )
+
+    def construct(self, hidden_states: Tensor):
+        bsz, seq_len, h = hidden_states.shape
+
+        hidden_states = hidden_states.view(-1, h)
+        logits = F.linear(hidden_states.to(ms.float32), self.weight.to(ms.float32))
+        scores = ops.softmax(logits, axis=-1)
+
+        # greedly select topk experts, ops.topk only support float
+        topk_weight, topk_idx = ops.topk(scores, self.config.num_experts_per_tok, sorted=True)
+        #print(topk_weight.numpy(), topk_idx.numpy())
+
+        if self.config.num_experts_per_tok > 1 and self.config.norm_topk_prob:
+            denominator = ops.sum(topk_weight, axis=-1, keep_dims=True) + 1e-20
+            topk_weight = topk_weight / denominator
+        else:
+            topk_weight = topk_weight * self.config.routed_scaling_factor
+
+        aux_loss = None
+        # calculate aux loss if in training
+        if self.training and self.config.aux_loss_alpha > 0.0:
+            scores_for_aux = scores
+            aux_topk = self.config.num_experts_per_tok
+            topk_idx_for_aux_loss = topk_idx.view(bsz, seq_len * aux_topk)
+            if self.config.seq_aux:
+                scores_for_seq_aux = scores_for_aux.view(bsz, seq_len, -1)
+                ce = ops.zeros((bsz, self.config.n_routed_experts), ms.float32)
+                ce = ms.mint.scatter_add(
+                    ce, dim=-1,
+                    index = topk_idx_for_aux_loss,
+                    src = ops.ones_like(topk_idx_for_aux_loss, dtype=ce.dtype),
+                )
+                ce = ce.div(seq_len * aux_topk / self.config.n_routed_experts)
+                aux_loss = (
+                    ce * ops.mean(scores_for_seq_aux, axis=1)
+                ).sum(axis=1).mean() * self.config.aux_loss_alpha
+            else:
+                mask_ce = ops.one_hot(topk_idx_for_aux_loss.view(-1), self.config.n_routed_experts, 1.0, 0.0)
+                ce = ops.mean(mask_ce, axis=0)
+                Pi = ops.mean(scores_for_aux, axis=0)
+                fi = ce * self.config.n_routed_experts
+                aux_loss = (Pi * fi).sum() * self.config.aux_loss_alpha
+
+        return topk_idx, topk_weight.to(self.config.dtype), aux_loss
+
+
+class DeepseekV2MoE(nn.Cell):
+    """
+    A mixed expert module containing shared experts.
+    """
+
+    def __init__(self, config: DeepseekV2Config):
+        super().__init__()
+        self.config = config
+        self.num_experts_per_tok = config.num_experts_per_tok
+
+        self.experts = nn.CellList([
+            FeedForward(
+                config.dim_model,
+                config.moe_intermediate_size,
+                activate_fn=config.activate_fn,
+                dtype=config.dtype,
+            )
+            for _ in range(config.n_routed_experts)
+        ])
+        self.gate = MoEGate(config)
+
+        if config.n_shared_experts is not None:
+            intermediate_size = config.moe_intermediate_size * config.n_shared_experts
+            self.shared_experts = FeedForward(
+                config.dim_model,
+                intermediate_size,
+                activate_fn=config.activate_fn,
+                dtype=config.dtype,
+            )
+
+    def construct(self, hidden_states: Tensor) -> Tensor:
+        identity = hidden_states
+        orig_shape = hidden_states.shape
+        topk_idx, topk_weight, aux_loss = self.gate(hidden_states)
+
+        # for debugging
+        #topk_idx = ops.arange(topk_idx.size).view(topk_weight.shape) % self.config.n_routed_experts
+            
+        hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
+        flat_topk_idx = topk_idx.view(-1)
+
+        hidden_states = ops.repeat_interleave(
+            hidden_states, self.num_experts_per_tok, axis=0
+        )
+        y = ops.zeros_like(hidden_states)
+        for i, expert in enumerate(self.experts):
+            mask = (flat_topk_idx == i)
+            y[mask] = expert(hidden_states[mask])
+            
+        y = (y.view(*topk_weight.shape, -1) * topk_weight.expand_dims(-1)).sum(axis=1)
+        y = y.to(hidden_states.dtype).view(*orig_shape)
+        # TODO : add aux_loss to the gradient graph
+
+        if self.config.n_shared_experts is not None:
+            y = y + self.shared_experts(identity)
+        return y
 
 
 class DeepseekV2DecoderLayer(nn.Cell):
@@ -299,6 +414,19 @@ class DeepseekV2DecoderLayer(nn.Cell):
             rms_layer_norm=True,
             dtype=config.dtype,
         )
+        if (
+            config.n_routed_experts is not None
+            and layer_idx >= config.first_k_dense_replace
+            and layer_idx % config.moe_layer_freq == 0
+        ):
+            self.mlp = DeepseekV2MoE(config)
+        else:
+            self.mlp = FeedForward(
+                config.dim_model,
+                config.intermediate_size,
+                activate_fn=config.activate_fn,
+                dtype=config.dtype,
+            )
 
     def construct(
         self,
@@ -321,6 +449,12 @@ class DeepseekV2DecoderLayer(nn.Cell):
         )
         hidden_states = hidden_states + residual  # Residual connection
 
+        # MLP Block
+        residual = hidden_states
+        hidden_states = self.post_attention_layernorm(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        hidden_states = hidden_states + residual
+
         return hidden_states, current_key_value
 
 
@@ -336,12 +470,23 @@ class DeepseekV2(BaseModel):
             embedding_size=config.dim_model,
             dtype=config.dtype,
         )
-
         self.layers = nn.CellList([
             DeepseekV2DecoderLayer(
                 config, layer_idx=i
-            ) for i in range(1)
+            ) for i in range(config.num_layers)
         ])
+        self.output_norm = LayerNorm(
+            config.dim_model,
+            eps=config.norm_eps,
+            rms_layer_norm=True,
+            dtype=config.dtype,
+        )
+        self.lm_head = Linear(
+            config.dim_model,
+            config.vocab_size,
+            bias=False,
+            dtype=config.dtype,
+        )
 
     def construct(
         self,
@@ -351,7 +496,21 @@ class DeepseekV2(BaseModel):
         use_cache: bool = False,
         past_key_values: Tuple[Tuple[Tensor]] = None,
         output_logits: bool = False,
-    ):
+    ) -> Tuple[Tensor, Any, Tensor]:
+        """
+        Args:
+            input_ids: A tensor of shape (batch, seq_len).
+            attention_mask: A tensor of shape (batch, seq_len, kv_seq_len).
+            input_embeds: A tensor of shape (batch, seq_len, dim_model).
+            use_cache: Boolean indicating whether to use cache.
+            past_key_values: Tuple of tensors for past key and value states.
+            output_logits: Boolean indicating whether to output logits.
+
+        Returns:
+            hidden_states: A tensor of shape (batch, seq_len, dim_model).
+            current_key_values: Tuple of tensors for current key and value states.
+            logits: A tensor of shape (batch, seq_len, vocab_size).
+        """
         attention_mask_2d = _prepare_attention_mask(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -362,11 +521,33 @@ class DeepseekV2(BaseModel):
         if input_embeds is None:
             input_embeds = self.input_embedding.construct(input_ids)
 
+        hidden_states = input_embeds
+        current_key_values = ()
         for i, layer in enumerate(self.layers):
+            #print("layer", i)
             layer: DeepseekV2DecoderLayer
-            input_embeds, current_key_value = layer.construct(
-                hidden_states=input_embeds,
+            hidden_states, current_key_value = layer.construct(
+                hidden_states=hidden_states,
                 attention_mask=attention_mask_2d,
                 use_cache=use_cache,
                 past_key_value=past_key_values[i] if past_key_values is not None else None,
             )
+            current_key_values += (current_key_value,)
+
+            import gc
+            gc.collect()
+            #print(f'mem_loc {ms.runtime.max_memory_allocated() / (2**30) :.2f} GB')
+
+        hidden_states = self.output_norm(hidden_states)
+
+        output_logits = True
+        logits = self.lm_head(hidden_states) if output_logits else None
+        current_key_values = current_key_values if use_cache else None
+
+        print('save')
+        import bmtrain_mindspore as bms
+        if bms.rank() == 0:
+            np.save('hidden_states.npy', hidden_states.to(ms.float32).numpy())
+            np.save('logits.npy', logits.to(ms.float32).numpy())
+
+        return hidden_states, current_key_values, logits
