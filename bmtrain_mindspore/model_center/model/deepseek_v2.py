@@ -301,7 +301,6 @@ class MoEGate(DistributedModule):
 
         # greedly select topk experts, ops.topk only support float
         topk_weight, topk_idx = ops.topk(scores, self.config.num_experts_per_tok, sorted=True)
-        #print(topk_weight.numpy(), topk_idx.numpy())
 
         if self.config.num_experts_per_tok > 1 and self.config.norm_topk_prob:
             denominator = ops.sum(topk_weight, axis=-1, keep_dims=True) + 1e-20
@@ -524,7 +523,6 @@ class DeepseekV2(BaseModel):
         hidden_states = input_embeds
         current_key_values = ()
         for i, layer in enumerate(self.layers):
-            #print("layer", i)
             layer: DeepseekV2DecoderLayer
             hidden_states, current_key_value = layer.construct(
                 hidden_states=hidden_states,
@@ -543,11 +541,5 @@ class DeepseekV2(BaseModel):
         output_logits = True
         logits = self.lm_head(hidden_states) if output_logits else None
         current_key_values = current_key_values if use_cache else None
-
-        print('save')
-        import bmtrain_mindspore as bms
-        if bms.rank() == 0:
-            np.save('hidden_states.npy', hidden_states.to(ms.float32).numpy())
-            np.save('logits.npy', logits.to(ms.float32).numpy())
 
         return hidden_states, current_key_values, logits
