@@ -532,10 +532,6 @@ class DeepseekV2(BaseModel):
             )
             current_key_values += (current_key_value,)
 
-            import gc
-            gc.collect()
-            #print(f'mem_loc {ms.runtime.max_memory_allocated() / (2**30) :.2f} GB')
-
         hidden_states = self.output_norm(hidden_states)
 
         output_logits = True
