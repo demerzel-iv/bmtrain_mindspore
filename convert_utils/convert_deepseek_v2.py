@@ -109,8 +109,6 @@ def convert_model(source_path: str, target_path: str):
             new_ckpt[f'layers.{i}.mlp.shared_experts.w_out.weight'] = \
                 old_ckpt[f'model.layers.{i}.mlp.shared_experts.down_proj.weight']
 
-        if i == 1: break
-
     os.makedirs(target_path, exist_ok=True)
 
     safe_save_file(new_ckpt, os.path.join(target_path, 'mindspore_model.safetensors'))
