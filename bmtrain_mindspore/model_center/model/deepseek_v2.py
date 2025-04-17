@@ -15,6 +15,19 @@ from .base_model import BaseModel, _prepare_attention_mask
 from .config import DeepseekV2Config
 from ..layer import Embedding, RotaryEmbedding, Linear, LayerNorm, FeedForward
 
+class AuxiliaryLoss:
+    @staticmethod
+    def grad_one(grad: Tensor):
+        return ops.ones_like(grad)
+
+    @staticmethod
+    def apply(x: Tensor, loss: Tensor):
+        if loss is None:
+            return x
+        assert loss.size == 1
+        loss.register_hook(AuxiliaryLoss.grad_one)
+        return x + 0 * loss
+
 class YarnRotaryEmbedding(RotaryEmbedding):
     # Inverse dim formula to find dim based on number of rotations
     @staticmethod
@@ -366,6 +379,8 @@ class DeepseekV2MoE(nn.Cell):
                 dtype=config.dtype,
             )
 
+        self.aux_loss = 0.
+
     def construct(self, hidden_states: Tensor) -> Tensor:
         identity = hidden_states
         orig_shape = hidden_states.shape
@@ -388,6 +403,8 @@ class DeepseekV2MoE(nn.Cell):
         y = (y.view(*topk_weight.shape, -1) * topk_weight.expand_dims(-1)).sum(axis=1)
         y = y.to(hidden_states.dtype).view(*orig_shape)
         # TODO : add aux_loss to the gradient graph
+        AuxiliaryLoss.apply(y, aux_loss)
+        self.aux_loss = float(aux_loss) if aux_loss is not None else 0.
 
         if self.config.n_shared_experts is not None:
             y = y + self.shared_experts(identity)
@@ -427,6 +444,8 @@ class DeepseekV2DecoderLayer(nn.Cell):
                 dtype=config.dtype,
             )
 
+        self.aux_loss = 0.
+
     def construct(
         self,
         hidden_states: Tensor,
@@ -453,6 +472,8 @@ class DeepseekV2DecoderLayer(nn.Cell):
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         hidden_states = hidden_states + residual
+
+        self.aux_loss = self.mlp.aux_loss if hasattr(self.mlp, 'aux_loss') else 0.
 
         return hidden_states, current_key_value
 
@@ -487,6 +508,8 @@ class DeepseekV2(BaseModel):
             dtype=config.dtype,
         )
 
+        self.aux_loss = 0.
+
     def construct(
         self,
         input_ids: Tensor = None,
@@ -495,6 +518,7 @@ class DeepseekV2(BaseModel):
         use_cache: bool = False,
         past_key_values: Tuple[Tuple[Tensor]] = None,
         output_logits: bool = False,
+        enable_checkpointing: bool = True,
     ) -> Tuple[Tensor, Any, Tensor]:
         """
         Args:
@@ -522,20 +546,31 @@ class DeepseekV2(BaseModel):
 
         hidden_states = input_embeds
         current_key_values = ()
+        aux_loss_sum = 0.
         for i, layer in enumerate(self.layers):
             layer: DeepseekV2DecoderLayer
-            hidden_states, current_key_value = layer.construct(
-                hidden_states=hidden_states,
-                attention_mask=attention_mask_2d,
-                use_cache=use_cache,
-                past_key_value=past_key_values[i] if past_key_values is not None else None,
-            )
+
+            kargs = {
+                'hidden_states': hidden_states,
+                'attention_mask': attention_mask_2d,
+                'use_cache': use_cache,
+                'past_key_value': past_key_values[i] if past_key_values is not None else None,
+            }
+            if enable_checkpointing:
+                if not self.training:
+                    raise ValueError('recompute is not used because self.training is False')
+                hidden_states, current_key_value = ms.recompute(layer, **kargs)
+            else:
+                hidden_states, current_key_value = layer.construct(**kargs)
+
             current_key_values += (current_key_value,)
+            aux_loss_sum += layer.aux_loss
+
+        # store aux loss for logging
+        self.aux_loss = aux_loss_sum
 
         hidden_states = self.output_norm(hidden_states)
-
-        output_logits = True
-        logits = self.lm_head(hidden_states) if output_logits else None
         current_key_values = current_key_values if use_cache else None
+        logits = self.lm_head(hidden_states) if output_logits else None
 
         return hidden_states, current_key_values, logits
