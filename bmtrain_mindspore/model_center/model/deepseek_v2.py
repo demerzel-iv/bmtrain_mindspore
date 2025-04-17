@@ -386,9 +386,6 @@ class DeepseekV2MoE(nn.Cell):
         orig_shape = hidden_states.shape
         topk_idx, topk_weight, aux_loss = self.gate(hidden_states)
 
-        # for debugging
-        #topk_idx = ops.arange(topk_idx.size).view(topk_weight.shape) % self.config.n_routed_experts
-            
         hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
         flat_topk_idx = topk_idx.view(-1)
 
@@ -402,7 +399,8 @@ class DeepseekV2MoE(nn.Cell):
             
         y = (y.view(*topk_weight.shape, -1) * topk_weight.expand_dims(-1)).sum(axis=1)
         y = y.to(hidden_states.dtype).view(*orig_shape)
-        # TODO : add aux_loss to the gradient graph
+        
+        # apply aux loss to the backward graph 
         AuxiliaryLoss.apply(y, aux_loss)
         self.aux_loss = float(aux_loss) if aux_loss is not None else 0.
 
