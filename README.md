@@ -35,17 +35,3 @@
         input_class, *class_init_args = cls._get_parameter_new_args(default_input, rc, init_param)
         new_type = cls._get_base_class(input_class)
 ```
-
-## 已完成
-
-- ZeRO-3优化
-    - 分布式模型存储
-    - 分布式模型的保存/加载
-    - 前向/反向传播计算正确性验证
-- checkpoint优化
-- ModelCenter
-    - 模型组件：Linear, Embedding, LayerNorm, Attention, FeedForward, TransformerBlock
-    - LLaMA
-        - 完整模型代码
-        - huggingface的ckpt到mindspore的ckpt的转换脚本
-- 验证模型训练能正确收敛
