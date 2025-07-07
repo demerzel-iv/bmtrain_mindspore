@@ -66,6 +66,16 @@ class FeedForward(Cell):
         dropout_p: float = None,
         dtype = ms.float32,
     ):
+        """
+        Args:
+            dim_in: Input dimension.
+            dim_ff: Intermediate dimension.
+            dim_out: Output dimension. If None, it will be set to dim_in.
+            activate_fn: Activation function. Options are 'relu', 'gelu', 'silu'. 'gated_' can be prefixed to use gated activation.
+            bias: Whether to use bias in the linear layers.
+            dropout_p: Dropout probability. If None, no dropout is applied.
+            dtype: Data type of the parameters.
+        """
         super().__init__()
         dim_out = dim_out if dim_out != None else dim_in
 

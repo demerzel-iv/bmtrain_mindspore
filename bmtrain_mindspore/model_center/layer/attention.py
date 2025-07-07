@@ -121,13 +121,11 @@ class Attention(Cell):
         if self.attn_scale:
             score = score / math.sqrt(self.dim_head)
 
-        #TODO if self.pos_bias_type == "relative":
-        #    if position_bias is not None:
-        #        score = score + position_bias
-
+        # This is a temporary fix to avoid nan in softmax caused by incorrect implementation of ops.masked_fill
         def remove_nan(grad: Tensor):
             return ops.masked_fill(grad, grad.isnan(), 0)
         score.register_hook(remove_nan)
+        # end
 
         score = ops.masked_fill(
             score,

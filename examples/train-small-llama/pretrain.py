@@ -10,46 +10,13 @@ from mindspore import mint, Tensor, Parameter
 from mindnlp.transformers import PreTrainedTokenizerFast, AutoTokenizer
 from bmtrain_mindspore.model_center.model.llama import Llama, LlamaConfig
 from bmtrain_mindspore.utils import Timer
+from bmtrain_mindspore.model_center.lr_scheduler import WarmupStableDecayLRScheduler
 
 from data_utils import DistributedDataLoader
-
-from mindspore import nn
-from mindspore.experimental import optim
 
 TOKENIZER_PATH = '/root/thunlp/data/Llama-2-7b-tokenizer'
 MODELFILE_SAVE_PATH = '/root/thunlp/data/test_model/model.safetensors'
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
-
-class WarmupStableDecayLRScheduler(optim.lr_scheduler.LRScheduler):
-    def __init__(
-        self,
-        optimizer,
-        last_epoch=-1,
-        warmup_steps=100,
-        decay_start=4000,
-        total_iters=5000,
-        lr=1e-5
-    ):
-        self.warmup_steps = warmup_steps
-        self.decay_start = decay_start
-        self.total_iters = total_iters
-        self.lr = lr
-        super(WarmupStableDecayLRScheduler, self).__init__(optimizer, last_epoch)
-
-    def get_lr(self):
-        if self.last_epoch < self.warmup_steps:
-            # Warmup
-            lr_ret = self.lr * (self.last_epoch + 1) / self.warmup_steps
-        elif self.last_epoch < self.decay_start:
-            # Stable
-            lr_ret = self.lr
-        else:
-            # Decay
-            decay_iters = self.total_iters - self.decay_start
-            lr_ret = self.lr * max(0, 1 - (self.last_epoch - self.decay_start) / decay_iters)
-
-        return [lr_ret] * len(self._last_lr)
-
 
 def random_init_model(model: Llama):
     for name, param in model.parameters_and_names():
@@ -228,5 +195,5 @@ bms.init_distributed()
 #train()
 #valid()
 
-# Avoid using multiple GPUs for generation
+# do not use multiple devices to generate
 generate()
